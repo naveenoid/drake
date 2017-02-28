@@ -34,6 +34,18 @@ drake_cc_googletest(
         "//drake/examples/kuka_iiwa_arm:models",
     ],
     deps = [
-        ":iiwa_ik_planner",
+        ":iiwa_ik_planner"
+    ],
+)
+
+drake_cc_googletest(
+    name = "iiwa_ik_range_test",
+    size = "medium",
+    srcs = ["test/ik_range_test.cc"],
+    data = [
+        "//drake/examples/kuka_iiwa_arm:models",
+    ],
+    deps = [
+        ":iiwa_ik_planner"
     ],
 )

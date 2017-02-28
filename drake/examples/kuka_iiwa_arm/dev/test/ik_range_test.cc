@@ -4,20 +4,12 @@
 
 #include "drake/common/drake_path.h"
 #include "drake/examples/kuka_iiwa_arm/dev/iiwa_ik_planner.h"
-//#include "drake/ex
 #include "drake/multibody/parsers/urdf_parser.h"
 
 namespace drake {
 namespace examples {
 namespace kuka_iiwa_arm {
 namespace {
-
-inline double get_orientation_difference(const Matrix3<double>& rot0,
-                                         const Matrix3<double>& rot1) {
-  AngleAxis<double> err(rot0.transpose() * rot1);
-  return err.angle();
-}
-
 
 std::vector<double> linspace(const double lower_limit, const double upper_limit,
                      const int number_points ) {
@@ -27,67 +19,42 @@ std::vector<double> linspace(const double lower_limit, const double upper_limit,
     spaced_vector.push_back(lower_limit + (upper_limit - lower_limit)
         * (itr / number_points));
   }
-
   return spaced_vector;
 }
 
-// With the current setup, this code simply searches for IK failures in the
-// Ranges corresponding to the IK demo.
+// This test method does a grid search on IK failures in the
+// Ranges corresponding to the pick_and_place_demo
 void IKGridTest(
-    const double x_min, const double x_max, const int x_num_points,
-    const double y_min, const double y_max, const int y_num_points,
-    const double z) {
+    std::vector<double> x_range,
+    std::vector<double> y_range,
+    std::vector<double> z_range) {
 
-  // TODO(naveenoid): Extract this tree from a common factory builder once
-  // its extracted from iiwa_wsg_sim.
-  auto tree_builder = std::make_unique<WorldSimTreeBuilder<double>>();
-
-  // Adds models to the simulation builder. Instances of these models can be
-  // subsequently added to the world.
-  tree_builder->StoreModel("iiwa",
-                           "/examples/kuka_iiwa_arm/urdf/"
-                               "iiwa14_simplified_collision.urdf");
-  tree_builder->StoreModel("table",
-                           "/examples/kuka_iiwa_arm/models/table/"
-                               "extra_heavy_duty_table_surface_only_collision.sdf");
-  tree_builder->StoreModel(
-      "wsg", "/examples/schunk_wsg/models/schunk_wsg_50.sdf");
-
-  // Build a world with two fixed tables.  A box is placed one on
-  // table, and the iiwa arm is fixed to the other.
-  // IIWA table
-  tree_builder->AddFixedModelInstance("table",
-                                      Eigen::Vector3d::Zero() /* xyz */,
-                                      Eigen::Vector3d::Zero() /* rpy */);
-  // Table 0 for pick and place demo.
-  tree_builder->AddFixedModelInstance("table",
-                                      Eigen::Vector3d(0.8, 0, 0) /* xyz */,
-                                      Eigen::Vector3d::Zero() /* rpy */);
-  // Table 1 for pick and place demo.
-  tree_builder->AddFixedModelInstance("table",
-                                      Eigen::Vector3d(0, 0.85, 0) /* xyz */,
-                                      Eigen::Vector3d::Zero() /* rpy */);
-
-  // The `z` coordinate of the top of the table in the world frame.
   const double kTableTopZInWorld = 0.7756;
 
-  // Coordinates for kRobotBase originally from iiwa_world_demo.cc.
-  // The intention is to center the robot on the table.
+// Coordinates for kRobotBase originally from iiwa_world_demo.cc.
+// The intention is to center the robot on the table.
   const Eigen::Vector3d kRobotBase(-0.243716, -0.625087, kTableTopZInWorld);
 
-  int id = tree_builder->AddFixedModelInstance("iiwa", kRobotBase);
-  *iiwa_instance = tree_builder->get_model_info_for_instance(id);
+  const std::string kModelPath =
+      GetDrakePath() +
+          "/examples/kuka_iiwa_arm/urdf/iiwa14_simplified_collision.urdf";
 
+  auto weld_to_frame = std::allocate_shared < RigidBodyFrame < double >> (
+      Eigen::aligned_allocator < RigidBodyFrame < double >> (), "world", nullptr, kRobotBase, Eigen::Vector3d());
 
+  std::unique_ptr <RigidBodyTree<double>> iiwa =
+      std::make_unique < RigidBodyTree < double >> ();
+  drake::parsers::urdf::AddModelInstanceFromUrdfFile(
+      kModelPath, multibody::joints::kFixed, nullptr, iiwa.get());
   const std::string kEndEffectorLinkName = "iiwa_link_ee";
 
-  std::vector<double> x_range = linspace(x_min, x_max, x_num_points);
-  std::vector<double> y_range = linspace(y_min, y_max, y_num_points);
 
+//  int id = tree_builder->AddFixedModelInstance("iiwa", kRobotBase);
+//  RigidBodyTree<double> *iiwa = tree_builder->get_model_info_for_instance(id);
+//
   IiwaIkPlanner ik_planner(kModelPath, kEndEffectorLinkName, nullptr);
-  IiwaIkPlanner::IkResult ik_res;
+  IKResults ik_res;
   IiwaIkPlanner::IkCartesianWaypoint wp;
-  wp.time = 0;
   wp.pos_tol = Vector3<double>(0.001, 0.001, 0.001);
   wp.rot_tol = 0.005;
   wp.constrain_orientation = true;
@@ -102,17 +69,15 @@ void IKGridTest(
 //  const Vector3<double> kLowerBound =
 //      -wp.pos_tol - kEpsilon * Vector3<double>::Ones();
 
-  int x_ctr = 0, y_ctr = 0;
   for (std::vector<double>::iterator it_x = x_range.begin();
-       it_x != x_range.end(); ++it_x, ++x_ctr) {
+       it_x != x_range.end(); ++it_x) {
     for (std::vector<double>::iterator it_y = y_range.begin();
-         it_y != y_range.end(); ++it_y, ++y_ctr) {
-
-      waypoints[0].
-          pose.translation() = Vector3<double>(*it_x, *it_y, z);
-
+         it_y != y_range.end(); ++it_y) {
+      for (std::vector<double>::iterator it_z = z_range.begin();
+           it_z != z_range.end(); ++it_z)
+        waypoints[0].
+            pose.translation() = Vector3<double>(*it_x, *it_y, *it_z);
 //      std::cout << *it_x << ", " << *it_y << " : ";
-
       bool ret =
           ik_planner.PlanSequentialTrajectory(waypoints, kQcurrent, &ik_res);
 //      if (ret) {
@@ -138,28 +103,48 @@ void IKGridTest(
 //  }
 }
 
+GTEST_TEST(testInverseKinematicsRange, range_test) {
 
-GTEST_TEST(testInverseKinematicsRange, Table1PreGraspTest) {
-IKGridTest(
--0.3556 /* x_min */, 7.3556 /* x_max */, 10 /* num_x */,
-0.381 /* y_min */, 1.231 /* y_max */, 10, 0.736+ 0.057/2
+// Extracted from the SDF
+// Table surface dimensions.
+const double kTablex_Length = 0.762;
+const double kTabley_Length = 0.7112;
 
+const int kNumXPoints = 3;
+const int kNumYPoints = 3;
+const int kNumZPoints = 2;
+
+const double kTable0x_Origin = 0.8, kTable0y_Origin = 0;
+const double kTable1x_Origin = 0.0, kTable1y_Origin = 0.85;
+
+std::vector<double> z_range = linspace(
+    0.926 /* grasp position */,
+    1.236 /* pre-grasp position */,
+    kNumZPoints
 );
 
+// The x and y range corresponding to table 0.
+std::vector<double> x_range_0 = linspace(
+    kTable0x_Origin - kTablex_Length / 2, kTable0x_Origin + kTablex_Length / 2,
+    kNumXPoints);
+std::vector<double> y_range_0 = linspace(
+    kTable0y_Origin - kTabley_Length / 2, kTable0y_Origin + kTabley_Length / 2,
+    kNumYPoints);
 
-GTEST_TEST(testInverseKinematicsRange, Table2PreGraspTest) {
-IKGridTest(
--0.3556 /* x_min */, 7.3556 /* x_max */, 10 /* num_x */,
-0.381 /* y_min */, 1.231 /* y_max */, 10, 0.736+ 0.057/2
+IKGridTest(x_range_0, y_range_0, z_range);
 
-);
+// The x and y range corresponding to table 1.
+std::vector<double> x_range_1 = linspace(
+    kTable1x_Origin - kTablex_Length / 2, kTable1x_Origin + kTablex_Length / 2,
+    kNumXPoints);
+std::vector<double> y_range_1 = linspace(
+    kTable1y_Origin - kTabley_Length / 2, kTable1y_Origin + kTabley_Length / 2,
+    kNumYPoints);
+
+IKGridTest(x_range_1, y_range_1, z_range);
 }
+
 }  // namespace
 }  // namespace kuka_iiwa_arm
 }  // namespace examples
 }  // namespace drake
-//
-//int main(int argc, char* argv[]) {
-//  gflags::ParseCommandLineFlags(&argc, &argv, true);
-//  return drake::examples::kuka_iiwa_arm::DoMain();
-//}
