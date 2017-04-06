@@ -3,8 +3,8 @@
 #include <memory>
 #include <utility>
 
-#include "drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place/action_primitives/iiwa_move.h"
 #include "drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place/action_primitives/gripper_action.h"
+#include "drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place/action_primitives/iiwa_move.h"
 #include "drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place/iiwa_state_feedback_plan.h"
 #include "drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place/pick_and_place_common.h"
 #include "drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place/state_machine_system.h"
@@ -45,8 +45,8 @@ template <typename T>
 std::unique_ptr<systems::RigidBodyPlant<T>> BuildCombinedPlant(
     ModelInstanceInfo<T>* iiwa_instance, ModelInstanceInfo<T>* wsg_instance,
     ModelInstanceInfo<T>* box_instance,
-    Eigen::Vector3d box_position = Vector3<double>(
-        1 + -0.43, -0.65, kTableTopZInWorld + 0.1),
+    Eigen::Vector3d box_position = Vector3<double>(1 + -0.43, -0.65,
+                                                   kTableTopZInWorld + 0.1),
     Eigen::Vector3d box_orientation = Vector3<double>(0, 0, 1)) {
   auto tree_builder = std::make_unique<WorldSimTreeBuilder<double>>();
 
@@ -104,11 +104,13 @@ class StateMachineAndPrimitives : public systems::Diagram<T> {
                             const double iiwa_action_primitive_rate = 0.01,
                             const double wsg_action_primitive_rate = 0.01);
 
-  const systems::InputPortDescriptor<T>& get_input_port_iiwa_robot_state() const {
+  const systems::InputPortDescriptor<T>& get_input_port_iiwa_robot_state()
+      const {
     return this->get_input_port(input_port_iiwa_robot_state_t_);
   }
 
-  const systems::InputPortDescriptor<T>& get_input_port_box_robot_state() const {
+  const systems::InputPortDescriptor<T>& get_input_port_box_robot_state()
+      const {
     return this->get_input_port(input_port_box_robot_state_t_);
   }
 
@@ -116,13 +118,11 @@ class StateMachineAndPrimitives : public systems::Diagram<T> {
     return this->get_input_port(input_port_wsg_status_);
   }
 
-  const systems::OutputPortDescriptor<T>&
-  get_output_port_iiwa_command() const {
+  const systems::OutputPortDescriptor<T>& get_output_port_iiwa_command() const {
     return this->get_output_port(output_port_iiwa_command_);
   }
 
-  const systems::OutputPortDescriptor<T>&
-  get_output_port_wsg_command() const {
+  const systems::OutputPortDescriptor<T>& get_output_port_wsg_command() const {
     return this->get_output_port(output_port_wsg_command_);
   }
 

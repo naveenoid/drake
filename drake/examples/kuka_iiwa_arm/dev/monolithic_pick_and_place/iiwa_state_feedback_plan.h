@@ -28,8 +28,8 @@ namespace pick_and_place {
 /// feedthrough thus eliminating algebriac loops when used in conjunction
 /// with a RigidBodyPlant within the same Diagram.
 class IiwaStateFeedbackPlanSource : public systems::LeafSystem<double> {
-// IMPORTANT NOTE : This component is not to be moved out of dev. See
-// issue #5736 for more details.
+  // IMPORTANT NOTE : This component is not to be moved out of dev. See
+  // issue #5736 for more details.
  public:
   DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(IiwaStateFeedbackPlanSource)
 

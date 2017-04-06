@@ -1,4 +1,4 @@
-#include "synchronous_world_state.h"
+#include "drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place/synchronous_world_state.h"
 
 #include "drake/multibody/parsers/urdf_parser.h"
 #include "drake/util/lcmUtil.h"
@@ -8,11 +8,10 @@ namespace examples {
 namespace kuka_iiwa_arm {
 namespace pick_and_place {
 
-SynchronousWorldState::SynchronousWorldState(
-    const Isometry3<double>& iiwa_base, const std::string& iiwa_path,
-    const std::string& ee_name) :
-    iiwa_model_path_(iiwa_path), ee_name_(ee_name), iiwa_base_(iiwa_base) {
-
+SynchronousWorldState::SynchronousWorldState(const Isometry3<double>& iiwa_base,
+                                             const std::string& iiwa_path,
+                                             const std::string& ee_name)
+    : iiwa_model_path_(iiwa_path), ee_name_(ee_name), iiwa_base_(iiwa_base) {
   iiwa_ee_pose_ = Isometry3<double>::Identity();
   iiwa_q_ = VectorX<double>::Zero(7);
   iiwa_v_ = VectorX<double>::Zero(7);
@@ -33,16 +32,13 @@ SynchronousWorldState::SynchronousWorldState(
   parsers::urdf::AddModelInstanceFromUrdfFile(
       iiwa_model_path_, multibody::joints::kFixed, base_frame, iiwa_.get());
   end_effector_ = iiwa_->FindBody(ee_name_.c_str());
-
 }
 
-SynchronousWorldState::~SynchronousWorldState() {
-}
+SynchronousWorldState::~SynchronousWorldState() {}
 
 void SynchronousWorldState::UnpackIiwaStatusMessage(
     const bot_core::robot_state_t* iiwa_msg) {
   iiwa_base_ = DecodePose(iiwa_msg->pose);
-
 
   for (int i = 0; i < iiwa_msg->num_joints; ++i) {
     iiwa_v_[i] = iiwa_msg->joint_velocity[i];
@@ -58,7 +54,6 @@ void SynchronousWorldState::UnpackIiwaStatusMessage(
 
 void SynchronousWorldState::UnpackWsgStatusMessage(
     const lcmt_schunk_wsg_status* wsg_msg) {
-
   // Change this once understood
   const double dt = 0.001;
 
@@ -79,7 +74,7 @@ void SynchronousWorldState::UnpackWsgStatusMessage(
 
 void SynchronousWorldState::UnpackObjectStatusMessage(
     const bot_core::robot_state_t* obj_msg) {
-//  obj_time_ = obj_msg->utime / 1e6;
+  //  obj_time_ = obj_msg->utime / 1e6;
   obj_pose_ = DecodePose(obj_msg->pose);
   obj_vel_ = DecodeTwist(obj_msg->twist);
 }

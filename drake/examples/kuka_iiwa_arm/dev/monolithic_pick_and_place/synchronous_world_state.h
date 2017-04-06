@@ -3,11 +3,11 @@
 #include <memory>
 #include <string>
 
-#include "drake/common/drake_path.h"
 #include "bot_core/robot_state_t.hpp"
-#include "drake/multibody/rigid_body_tree.h"
-#include "drake/lcmt_schunk_wsg_status.hpp"
+#include "drake/common/drake_path.h"
 #include "drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place/pick_and_place_common.h"
+#include "drake/lcmt_schunk_wsg_status.hpp"
+#include "drake/multibody/rigid_body_tree.h"
 
 namespace drake {
 namespace examples {
@@ -17,13 +17,15 @@ namespace pick_and_place {
 /**
  * A class that represents the iiwa pick and place world, which contains a
  * KUKA iiwa arm, a Schunk WSG gripper, and an object that is being
- * manipulated. These states are updated through LCM messages. This is essentially
+ * manipulated. These states are updated through LCM messages. This is
+ * essentially
  * a container for reading and storing the results of the LCM messages.
  */
 class SynchronousWorldState {
  public:
   /**
-   * Constructs an SynchronousWorldState object that holds the states that represent a pick
+   * Constructs an SynchronousWorldState object that holds the states that
+   * represent a pick
    * and place scenario.
    */
   SynchronousWorldState(
@@ -61,7 +63,6 @@ class SynchronousWorldState {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  private:
-
   std::unique_ptr<RigidBodyTree<double>> iiwa_;
   const std::string iiwa_model_path_;
   const std::string ee_name_;
