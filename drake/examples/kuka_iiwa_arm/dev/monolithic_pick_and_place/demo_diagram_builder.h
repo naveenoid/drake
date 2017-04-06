@@ -3,8 +3,11 @@
 #include <memory>
 #include <utility>
 
+#include "drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place/action_primitives/iiwa_move.h"
+#include "drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place/action_primitives/gripper_action.h"
 #include "drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place/iiwa_state_feedback_plan.h"
 #include "drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place/pick_and_place_common.h"
+#include "drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place/state_machine_system.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_lcm.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_world/iiwa_wsg_diagram_factory.h"
 #include "drake/examples/schunk_wsg/schunk_wsg_lcm.h"
@@ -41,7 +44,10 @@ const Eigen::Vector3d kRobotBase(-0.243716, -0.625087, kTableTopZInWorld);
 template <typename T>
 std::unique_ptr<systems::RigidBodyPlant<T>> BuildCombinedPlant(
     ModelInstanceInfo<T>* iiwa_instance, ModelInstanceInfo<T>* wsg_instance,
-    ModelInstanceInfo<T>* box_instance) {
+    ModelInstanceInfo<T>* box_instance,
+    Eigen::Vector3d box_position = Vector3<double>(
+        1 + -0.43, -0.65, kTableTopZInWorld + 0.1),
+    Eigen::Vector3d box_orientation = Vector3<double>(0, 0, 1)) {
   auto tree_builder = std::make_unique<WorldSimTreeBuilder<double>>();
 
   // Adds models to the simulation builder. Instances of these models can be
@@ -90,6 +96,47 @@ std::unique_ptr<systems::RigidBodyPlant<T>> BuildCombinedPlant(
   auto plant = std::make_unique<RigidBodyPlant<T>>(tree_builder->Build());
   return (std::move(plant));
 }
+
+template <typename T>
+class StateMachineAndPrimitives : public systems::Diagram<T> {
+ public:
+  StateMachineAndPrimitives(const RigidBodyTree<T>& iiwa_tree,
+                            const double iiwa_action_primitive_rate = 0.01,
+                            const double wsg_action_primitive_rate = 0.01);
+
+  const systems::InputPortDescriptor<T>& get_input_port_iiwa_robot_state() const {
+    return this->get_input_port(input_port_iiwa_robot_state_t_);
+  }
+
+  const systems::InputPortDescriptor<T>& get_input_port_box_robot_state() const {
+    return this->get_input_port(input_port_box_robot_state_t_);
+  }
+
+  const systems::InputPortDescriptor<T>& get_input_port_wsg_status() const {
+    return this->get_input_port(input_port_wsg_status_);
+  }
+
+  const systems::OutputPortDescriptor<T>&
+  get_output_port_iiwa_command() const {
+    return this->get_output_port(output_port_iiwa_command_);
+  }
+
+  const systems::OutputPortDescriptor<T>&
+  get_output_port_wsg_command() const {
+    return this->get_output_port(output_port_wsg_command_);
+  }
+
+ protected:
+  IiwaMove* iiwa_move_{nullptr};
+  GripperAction* gripper_action_{nullptr};
+  PickAndPlaceStateMachineSystem* pick_and_place_state_machine_{nullptr};
+
+  int input_port_iiwa_robot_state_t_{-1};
+  int input_port_box_robot_state_t_{-1};
+  int input_port_wsg_status_{-1};
+  int output_port_iiwa_command_{-1};
+  int output_port_wsg_command_{-1};
+};
 
 template <typename T>
 class IiwaWsgPlantGeneratorsEstimatorsAndVisualizer
