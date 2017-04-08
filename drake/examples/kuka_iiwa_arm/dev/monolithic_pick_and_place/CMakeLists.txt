@@ -23,6 +23,7 @@ if(lcm_FOUND)
       drakeSystemPrimitives
       drakeTrajectories
       drakeMultibodyParsers
+      drakeSensors
       robotlocomotion-lcmtypes-cpp)
   drake_install_libraries(pickAndPlaceMonolithic)
   drake_install_headers(

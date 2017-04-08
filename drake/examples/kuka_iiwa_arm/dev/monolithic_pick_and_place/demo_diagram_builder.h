@@ -15,6 +15,7 @@
 #include "drake/multibody/rigid_body_plant/drake_visualizer.h"
 #include "drake/multibody/rigid_body_plant/rigid_body_plant.h"
 #include "drake/systems/framework/diagram.h"
+#include "drake/systems/sensors/rgbd_camera.h"
 
 namespace drake {
 using systems::DrakeVisualizer;
@@ -59,8 +60,18 @@ std::unique_ptr<systems::RigidBodyPlant<T>> BuildCombinedPlant(
   tree_builder->StoreModel(
       "box",
       "/examples/kuka_iiwa_arm/models/objects/block_for_pick_and_place.urdf");
+
   tree_builder->StoreModel("wsg",
                            "/examples/schunk_wsg/models/schunk_wsg_50.sdf");
+
+  tree_builder->StoreModel(
+      "bottle",
+      // "/examples/kuka_iiwa_arm/models/bottle/model-1_4.sdf");
+      "/examples/kuka_iiwa_arm/models/bottle/bottle.urdf");
+
+  tree_builder->StoreModel(
+      "hsr",
+      "/../../../../ws_hsrb/src/hsrb_description/robots/hsrb3s.urdf");
 
   // Build a world with two fixed tables.  A box is placed one on
   // table, and the iiwa arm is fixed to the other.
@@ -73,20 +84,34 @@ std::unique_ptr<systems::RigidBodyPlant<T>> BuildCombinedPlant(
   tree_builder->AddFixedModelInstance("table",
                                       Eigen::Vector3d(0, 0.85, 0) /* xyz */,
                                       Eigen::Vector3d::Zero() /* rpy */);
+  int hsr_id = tree_builder->AddFixedModelInstance(
+      "hsr",
+      Eigen::Vector3d(0.8, 0.8, 0) /* xyz */,
+      Eigen::Vector3d::Zero() /* rpy */);
+  std::cout << "hsr id: " << hsr_id << std::endl;
+
+  int bottle_id = tree_builder->AddFloatingModelInstance(
+  // tree_builder->AddFloatingModelInstance(
+      "bottle",
+      Eigen::Vector3d(1 - 0.43, -0.65, kTableTopZInWorld + 0.1) /* xyz */,
+      Eigen::Vector3d::Zero() /* rpy */);
+
+  *box_instance = tree_builder->get_model_info_for_instance(bottle_id);
 
   tree_builder->AddGround();
 
   // Start the box slightly above the table.  If we place it at
   // the table top exactly, it may start colliding the table (which is
   // not good, as it will likely shoot off into space).
-  const Eigen::Vector3d kBoxBase(1 + -0.43, -0.65, kTableTopZInWorld + 0.1);
+  const Eigen::Vector3d kBoxBase(1 + -0.33, -0.8, kTableTopZInWorld + 0.1);
 
   int id = tree_builder->AddFixedModelInstance("iiwa", kRobotBase);
   *iiwa_instance = tree_builder->get_model_info_for_instance(id);
+
   id = tree_builder->AddFloatingModelInstance("box", kBoxBase,
                                               Vector3<double>(0, 0, 1));
 
-  *box_instance = tree_builder->get_model_info_for_instance(id);
+  // *box_instance = tree_builder->get_model_info_for_instance(id);
   id = tree_builder->AddModelInstanceToFrame(
       "wsg", Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero(),
       tree_builder->tree().findFrame("iiwa_frame_ee"),
@@ -182,6 +207,7 @@ class IiwaWsgPlantGeneratorsEstimatorsAndVisualizer
   DrakeVisualizer* drake_visualizer_{nullptr};
   IiwaStateFeedbackPlanSource* iiwa_trajectory_generator_{nullptr};
   SchunkWsgTrajectoryGenerator* wsg_trajectory_generator_{nullptr};
+  systems::sensors::RgbdCamera* rgbd_camera_{nullptr};
 
   int input_port_iiwa_plan_{-1};
   int input_port_wsg_plan_{-1};

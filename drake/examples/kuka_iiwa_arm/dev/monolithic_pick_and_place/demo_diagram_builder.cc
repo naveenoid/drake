@@ -11,12 +11,14 @@
 #include "drake/multibody/rigid_body_plant/rigid_body_plant.h"
 #include "drake/systems/framework/diagram.h"
 #include "drake/systems/framework/diagram_builder.h"
+#include "drake/systems/sensors/rgbd_camera.h"
 
 namespace drake {
 using systems::DrakeVisualizer;
 using systems::DiagramBuilder;
 using lcm::DrakeLcm;
 using systems::RigidBodyPlant;
+using systems::sensors::RgbdCamera;
 
 namespace examples {
 using schunk_wsg::SchunkWsgTrajectoryGenerator;
@@ -46,6 +48,15 @@ IiwaWsgPlantGeneratorsEstimatorsAndVisualizer<
 
   builder.Connect(plant_->get_output_port_plant_state(),
                   drake_visualizer_->get_input_port(0));
+
+  rgbd_camera_ = builder.template AddSystem<RgbdCamera>(
+  "rgbd_camera", plant_->get_plant().get_rigid_body_tree(),
+      Eigen::Vector3d(1.3, 1.3, 1.5),
+      Eigen::Vector3d(0., M_PI_4 * 0.4, -M_PI + M_PI_4 * 1.1),
+      M_PI_4, true);
+
+  builder.Connect(plant_->get_output_port_plant_state(),
+                  rgbd_camera_->state_input_port());
 
   iiwa_trajectory_generator_ =
       builder.template AddSystem<IiwaStateFeedbackPlanSource>(
@@ -91,6 +102,8 @@ IiwaWsgPlantGeneratorsEstimatorsAndVisualizer<
                   wsg_status_sender_->get_input_port(0));
   output_port_wsg_status_ =
       builder.ExportOutput(wsg_status_sender_->get_output_port(0));
+
+  builder.ExportOutput(rgbd_camera_->color_image_output_port());
 
   builder.BuildInto(this);
 }

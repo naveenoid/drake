@@ -50,7 +50,7 @@ int DoMain(void) {
                                               multibody::joints::kFixed,
                                               iiwa_base_frame, &iiwa);
 
-  auto state_machine = builder.template AddSystem<StateMachineAndPrimitives>(
+   auto state_machine = builder.template AddSystem<StateMachineAndPrimitives>(
       iiwa, 0.01 /* Iiwa_action_primitive_rate */,
       0.01 /* Wsg_action_primtiive_rate */);
 
