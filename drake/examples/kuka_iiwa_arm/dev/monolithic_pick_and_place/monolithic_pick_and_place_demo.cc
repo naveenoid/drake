@@ -11,7 +11,7 @@
 #include "drake/examples/kuka_iiwa_arm/iiwa_common.h"
 #include "drake/lcm/drake_lcm.h"
 #include "drake/lcmt_schunk_wsg_status.hpp"
-#include "drake/lcmtypes/drake/lcmt_schunk_wsg_command.hpp"
+#include "drake/lcmt_schunk_wsg_command.hpp"
 #include "drake/multibody/rigid_body_plant/rigid_body_plant.h"
 #include "drake/systems/analysis/simulator.h"
 #include "drake/systems/framework/diagram.h"
