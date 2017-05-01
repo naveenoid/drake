@@ -5,6 +5,7 @@ load("//tools:cpplint.bzl", "cpplint")
 load(
     "//tools:drake.bzl",
     "drake_cc_library",
+    "drake_cc_binary",
     "drake_cc_googletest",
 )
 
@@ -37,4 +38,11 @@ drake_cc_googletest(
     deps = [
         ":iiwa_ik_planner",
     ],
+)
+    
+drake_cc_binary(
+    name = "optritrack_box_test",
+    srcs = ["test/optitrack_box_test.cc"],
+    deps = ["@optitrack_driver//lcmtypes:optitrack_lcmtypes", 
+            ],
 )
