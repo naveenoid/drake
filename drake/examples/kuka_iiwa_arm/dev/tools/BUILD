@@ -23,6 +23,18 @@ drake_cc_library(
         "//drake/systems/rendering:drake_visualizer_client",
     ],
 )
+#
+#drake_cc_library(
+#    name = "optitrack_handler",
+#    srcs = ["optitrack_handler.cc"],
+#    hdrs = ["optitrack_handler.h"],
+#    visibility =  ["//drake/examples/kuka_iiwa_arm:__subpackages__"],
+#    deps = ["@optitrack_driver//lcmtypes:optitrack_lcmtypes", 
+#            "//drake/common:common",
+#            "//drake/util:lcm_util",
+#            "//drake/math:geometric_transform"
+#    ],
+#)
 
 drake_cc_binary(
     name = "simple_tree_visualizer_demo",
@@ -33,6 +45,24 @@ drake_cc_binary(
         "//drake/manipulation/models/iiwa_description:models",
     ],
     test_rule_args = ["--num_configurations=1"],
+    deps = [
+        ":simple_tree_visualizer",
+        "//drake/common",
+        "//drake/lcm",
+        "//drake/multibody/parsers",
+        "//drake/systems/framework",
+        "@gflags//:gflags",
+    ],
+)
+
+drake_cc_binary(
+    name = "floating_object_tree_visualizer_demo",
+    srcs = ["floating_object_tree_visualizer_demo.cc"],
+    add_test_rule = 1,
+    data = [
+        "//drake/examples/kuka_iiwa_arm:models",
+    ],
+    test_rule_args = ["--num_configurations=10"],
     deps = [
         ":simple_tree_visualizer",
         "//drake/common",

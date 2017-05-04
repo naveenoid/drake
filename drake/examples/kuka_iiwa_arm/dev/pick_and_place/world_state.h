@@ -6,6 +6,8 @@
 
 #include <lcm/lcm-cpp.hpp>
 #include "bot_core/robot_state_t.hpp"
+#include "optitrack/optitrack_frame_t.hpp"
+
 
 #include "drake/lcmt_schunk_wsg_status.hpp"
 #include "drake/multibody/rigid_body_tree.h"
@@ -27,7 +29,8 @@ class WorldState {
    * and place scenario.
    */
   WorldState(const std::string& iiwa_model_path,
-             const std::string& end_effector_name, lcm::LCM* lcm);
+             const std::string& end_effector_name, lcm::LCM* lcm,
+             bool object_from_optitrack = false);
 
   virtual ~WorldState();
 
@@ -84,6 +87,11 @@ class WorldState {
                           const std::string& chan,
                           const bot_core::robot_state_t* obj_msg);
 
+  // Handles object states from the optitrack LCM message.
+  void HandleObjectStatus(const lcm::ReceiveBuffer* rbuf,
+                          const std::string& chan,
+                          const optitrack::optitrack_frame_t* optitrack_msg);
+
   // We can't initialize the RigidBodyTree unless we know where its base is
   // located. Since this information comes from LCM and thus may be delayed,
   // it's easier for us to own a model internally.
@@ -110,6 +118,7 @@ class WorldState {
   double obj_time_;
   Isometry3<double> obj_pose_;
   Vector6<double> obj_vel_;
+  bool object_from_optitrack_{false};
 
   // LCM subscription management.
   lcm::LCM* lcm_;

@@ -41,8 +41,18 @@ drake_cc_googletest(
 )
     
 drake_cc_binary(
-    name = "optritrack_box_test",
+    name = "optitrack_box_test",
     srcs = ["test/optitrack_box_test.cc"],
+    data = [
+            "//drake/examples/kuka_iiwa_arm:models",
+        ],
     deps = ["@optitrack_driver//lcmtypes:optitrack_lcmtypes", 
+            "//drake/common:common",
+            "//drake/examples/kuka_iiwa_arm/dev/tools:simple_tree_visualizer",
+            "//drake/util:lcm_util",
+            "//drake/multibody/parsers",
+            "//drake/systems/framework",
+            "@gflags//:gflags",
+            "//drake/math:geometric_transform"
             ],
 )
