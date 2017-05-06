@@ -32,8 +32,9 @@ drake_cc_library(
         "//drake/multibody:rigid_body_tree",
         "//drake/multibody/parsers",
         "//drake/util:lcm_util",
-        "@optitrack_driver//lcmtypes:optitrack_lcmtypes", 
-    ],
+        "@optitrack_driver//lcmtypes:optitrack_lcmtypes",
+        "//drake/examples/kuka_iiwa_arm/dev/tools:optitrack_handler",
+      ],
 )
 
 drake_cc_binary(
@@ -50,6 +51,7 @@ drake_cc_binary(
         "//drake/examples/kuka_iiwa_arm/dev:iiwa_ik_planner",
         "//drake/examples/schunk_wsg:schunk_wsg_lcm",
         "//drake/util:lcm_util",
+        "@gflags//:gflags",
     ],
 )
 

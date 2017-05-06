@@ -60,13 +60,13 @@ class TestOptitrackData{
     rot_mat.col(2) = Eigen::Vector3d::UnitY();
     world_X_optitrack.linear() = rot_mat;
 
-    Eigen::VectorXd body_state = Eigen::VectorXd::Zero(7 * num_objects_);
+    Eigen::VectorXd body_state = Eigen::VectorXd::Zero(7 * num_objects_in_frame_);
     if(process_frame_) {
     std::vector<optitrack::optitrack_rigid_body_t> rigid_bodies =
         optitrack_msg->rigid_bodies;
 
-      Eigen::VectorXd world_state = Eigen::VectorXd::Zero(7 * num_objects_);
-      for(int i = 0 ; i < num_objects_; ++i) {
+      Eigen::VectorXd world_state = Eigen::VectorXd::Zero(7 * num_objects_in_frame_);
+      for(int i = 0 ; i < num_objects_in_frame_; ++i) {
 
         Isometry3<double> optitrack_X_object;
 
@@ -93,9 +93,9 @@ class TestOptitrackData{
       const optitrack::optitrack_data_descriptions_t* optitrack_msg) {
     if(!process_frame_) {
       tree_ = std::make_unique<RigidBodyTree<double>>();
-      num_objects_ = optitrack_msg->num_rigid_bodies;
+      num_objects_in_frame_ = optitrack_msg->num_rigid_bodies;
       drake::log()->info("Optitrack had : {} bodies",
-                         num_objects_);
+                         num_objects_in_frame_);
       std::vector<optitrack::optitrack_rigid_body_description_t>
           rigid_bodies = optitrack_msg->rigid_bodies;
       for (int i = 0; i < optitrack_msg->num_rigid_bodies; ++i) {
@@ -108,7 +108,7 @@ class TestOptitrackData{
           Eigen::Vector3d::Zero() /* base position */,
           Eigen::Vector3d::Zero() /* base orientation */);
 
-      for(int i = 0; i < num_objects_; ++i) {
+      for(int i = 0; i < num_objects_in_frame_; ++i) {
         parsers::ModelInstanceIdTable table;
         table = drake::parsers::urdf::AddModelInstanceFromUrdfFile(
             drake::GetDrakePath() + kModelPath, drake::multibody::joints::kQuaternion,
@@ -125,9 +125,9 @@ class TestOptitrackData{
   drake::lcm::DrakeLcm* lcm_{nullptr};
   std::unique_ptr<RigidBodyTreed> tree_{nullptr};
   std::list<::lcm::Subscription*> lcm_subscriptions_;
-  Isometry3 world_X_optitrack;
+//  Isometry3<double> world_X_optitrack;
   bool process_frame_{false};
-  int num_objects_{0};
+  int num_objects_in_frame_{0};
   std::unique_ptr<tools::SimpleTreeVisualizer> simple_tree_visualizer_{nullptr};
 };
 

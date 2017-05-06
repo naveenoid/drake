@@ -23,18 +23,27 @@ drake_cc_library(
         "//drake/systems/rendering:drake_visualizer_client",
     ],
 )
-#
-#drake_cc_library(
-#    name = "optitrack_handler",
-#    srcs = ["optitrack_handler.cc"],
-#    hdrs = ["optitrack_handler.h"],
-#    visibility =  ["//drake/examples/kuka_iiwa_arm:__subpackages__"],
-#    deps = ["@optitrack_driver//lcmtypes:optitrack_lcmtypes", 
-#            "//drake/common:common",
-#            "//drake/util:lcm_util",
-#            "//drake/math:geometric_transform"
-#    ],
-#)
+
+drake_cc_library(
+    name = "optitrack_handler",
+    srcs = ["optitrack_handler.cc"],
+    hdrs = ["optitrack_handler.h"],
+    visibility =  ["//drake/examples/kuka_iiwa_arm:__subpackages__"],
+    deps = ["@optitrack_driver//lcmtypes:optitrack_lcmtypes", 
+            "//drake/common:common",
+            "//drake/util:lcm_util",
+            "//drake/math:geometric_transform",
+            ":moving_average_filter"
+    ],
+)
+
+drake_cc_library(
+    name = "moving_average_filter",
+    srcs = ["moving_average_filter.cc"],
+    hdrs = ["moving_average_filter.h"],
+    visibility =  ["//drake/examples/kuka_iiwa_arm:__subpackages__"],
+    deps = ["//drake/common:common"],
+)
 
 drake_cc_binary(
     name = "simple_tree_visualizer_demo",

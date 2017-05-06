@@ -1,7 +1,12 @@
 #include "drake/examples/kuka_iiwa_arm/dev/pick_and_place/world_state.h"
 
+#include "bot_core/robot_state_t.hpp"
+#include <lcm/lcm-cpp.hpp>
+#include "optitrack/optitrack_frame_t.hpp"
+
 #include "drake/multibody/parsers/urdf_parser.h"
 #include "drake/util/lcmUtil.h"
+#include "drake/examples/kuka_iiwa_arm/dev/tools/optitrack_handler.h"
 
 namespace drake {
 namespace examples {
@@ -12,7 +17,28 @@ WorldState::WorldState(const std::string& iiwa_model_path,
                        const std::string& end_effector_name, lcm::LCM* lcm)
     : iiwa_model_path_(iiwa_model_path),
       ee_name_(end_effector_name),
-      lcm_(lcm) {
+      track_object_from_optitrack_(false), lcm_(lcm) {
+  ConstructorCommon();
+}
+
+WorldState::WorldState(const std::string &iiwa_model_path,
+                       const std::string &end_effector_name,
+                       lcm::LCM *lcm,
+                       int optitrack_object_index,
+                       int optitrack_filter_window_size) :
+    iiwa_model_path_(iiwa_model_path),
+    ee_name_(end_effector_name),
+    track_object_from_optitrack_(true), lcm_(lcm) {
+  if(optitrack_filter_window_size == 1) {
+    optitrack_handler_ = std::make_unique<tools::OptitrackHandler>(
+        optitrack_object_index);
+  }
+  ConstructorCommon();
+}
+
+
+
+void WorldState::ConstructorCommon() {
   iiwa_time_ = -1;
   iiwa_base_ = iiwa_ee_pose_ = Isometry3<double>::Identity();
   iiwa_q_ = VectorX<double>::Zero(7);
@@ -27,6 +53,7 @@ WorldState::WorldState(const std::string& iiwa_model_path,
   obj_time_ = -1;
   obj_pose_ = Isometry3<double>::Identity();
   obj_vel_.setZero();
+
 }
 
 WorldState::~WorldState() {
@@ -48,8 +75,13 @@ void WorldState::SubscribeToWsgStatus(const std::string& channel) {
 }
 
 void WorldState::SubscribeToObjectStatus(const std::string& channel) {
-  lcm_subscriptions_.push_back(
-      lcm_->subscribe(channel, &WorldState::HandleObjectStatus, this));
+  if(!track_object_from_optitrack_) {
+    lcm_subscriptions_.push_back(
+        lcm_->subscribe(channel, &WorldState::HandleObjectStatus, this));
+  } else {
+    lcm_subscriptions_.push_back(
+        lcm_->subscribe(channel, &WorldState::HandleOptitrackObjectStatus, this));
+  }
 }
 
 void WorldState::HandleIiwaStatus(const lcm::ReceiveBuffer* rbuf,
@@ -112,6 +144,19 @@ void WorldState::HandleObjectStatus(const lcm::ReceiveBuffer* rbuf,
   obj_time_ = obj_msg->utime / 1e6;
   obj_pose_ = DecodePose(obj_msg->pose);
   obj_vel_ = DecodeTwist(obj_msg->twist);
+}
+
+void WorldState::HandleOptitrackObjectStatus(
+    const lcm::ReceiveBuffer *rbuf, const std::string &chan,
+    const optitrack::optitrack_frame_t *optitrack_msg) {
+  obj_time_ = optitrack_msg->utime / 1e6;
+
+  obj_pose_ =
+      optitrack_handler_->TrackedObjectPoseInWorld(optitrack_msg);
+
+  // TODO(naveenoid) : No way of computing velocities for now.
+  obj_vel_ = Eigen::VectorXd::Zero(6);
+
 }
 
 }  // namespace pick_and_place

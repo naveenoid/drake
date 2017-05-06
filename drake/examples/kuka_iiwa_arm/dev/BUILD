@@ -56,3 +56,21 @@ drake_cc_binary(
             "//drake/math:geometric_transform"
             ],
 )
+
+   
+drake_cc_binary(
+    name = "optitrack_pick_and_place_setup_test",
+    srcs = ["test/optitrack_pick_and_place_setup_test.cc"],
+    data = [
+            "//drake/examples/kuka_iiwa_arm:models",
+        ],
+    deps = ["@optitrack_driver//lcmtypes:optitrack_lcmtypes", 
+            "//drake/common:common",
+            "//drake/examples/kuka_iiwa_arm/dev/tools:simple_tree_visualizer",
+            "//drake/util:lcm_util",
+            "//drake/multibody/parsers",
+            "//drake/systems/framework",
+            "@gflags//:gflags",
+            "//drake/math:geometric_transform"
+            ],
+)
