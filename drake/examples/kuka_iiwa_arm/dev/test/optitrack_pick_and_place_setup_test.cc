@@ -64,6 +64,9 @@ class TestOptitrackData{
                                             &TestOptitrackData::HandleOptitrackDataDescriptionMsg,
                                             this));
 
+    for (unsigned int i =0; i<tracked_object_id_.size(); ++i) {
+      drake::log()->info("Tracked object {}", tracked_object_id_.at(i));
+    }
     drake::log()->info("Subscribed to {}","OPTITRACK_DATA_DESCRIPTIONS");
   }
 
@@ -74,15 +77,24 @@ class TestOptitrackData{
 
     Eigen::VectorXd body_state = Eigen::VectorXd::Zero(7 * 2);
     if(process_frame_) {
+
+
+      std::vector<unsigned int> tracked_object_id;
+
+      tracked_object_id.push_back(FLAGS_box_id);
+      tracked_object_id.push_back(FLAGS_robot_id);
+
       std::vector<optitrack::optitrack_rigid_body_t> rigid_bodies =
           optitrack_msg->rigid_bodies;
+//      drake::log()->info("Got rigid bodies, tracked object size {}", tracked_object_id_.size());
 
-      Eigen::VectorXd world_state = Eigen::VectorXd::Zero(7 * 2);
+//      Eigen::VectorXd world_state = Eigen::VectorXd::Zero(7 * 2);
       for(int i = 0 ; i < 2; ++i) {
 
-        int id = tracked_object_id_[i];
+        int id = tracked_object_id.at(i);
         Isometry3<double> optitrack_X_object;
 
+        drake::log()->info("So far ok at {}", id);
         Eigen::Quaterniond quaternion(rigid_bodies[id].quat[3], rigid_bodies[id].quat[0],
                                       rigid_bodies[id].quat[1], rigid_bodies[id].quat[2]);
 
@@ -97,8 +109,8 @@ class TestOptitrackData{
         body_state.segment<4>(7 * i + 3) = drake::math::rotmat2quat(world_X_object.linear());
       }
       simple_tree_visualizer_->visualize(body_state);
+      drake::log()->info("Drawing frame");
     }
-    drake::log()->info("Drawing frame");
   }
 
   void HandleOptitrackDataDescriptionMsg(
@@ -156,8 +168,8 @@ int do_main() {
 
   std::vector<unsigned int> tracked_object_id;
 
-  tracked_object_id[0] = FLAGS_robot_id;
-  tracked_object_id[1] = FLAGS_box_id;
+  tracked_object_id.push_back(FLAGS_box_id);
+  tracked_object_id.push_back(FLAGS_robot_id);
 
   TestOptitrackData(&lcm, tracked_object_id);
 
