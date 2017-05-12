@@ -51,8 +51,8 @@ const Eigen::Vector3d kRobotBase(-0.243716, -0.625087, kTableTopZInWorld);
  * `systems::RigidBodyPlant`.
  * @param chosen_box An integer from 1-3 to indicate which of the 3 possible
  * boxes are to be added into this tree. The number 1 is the "small" sized
- * box, 2 is the "medium, and 3 is the large). The corresponding models can
- * be found in the /models folder.
+ * box, 2 is the "medium, 3 is the large, 4 is extra large). The
+ * corresponding models can be found in the /models folder.
  * @param box_position The position of the target box in world coordinates
  * as a Vector3 object.
  * @param box_orientation The orientation of the target box in RPY
@@ -84,8 +84,10 @@ std::unique_ptr<systems::RigidBodyPlant<T>> BuildCombinedPlant(
                            "/examples/kuka_iiwa_arm/models/objects/"
                            "block_for_pick_and_place_large_size.urdf");
   tree_builder->StoreModel(
-      "wsg",
-      "/manipulation/models/wsg_50_description/sdf/schunk_wsg_50.sdf");
+      "box_extra_large", "/examples/kuka_iiwa_arm/models/objects/"
+          "block_for_pick_and_place_extra_large_size.urdf");
+  tree_builder->StoreModel("wsg",
+                           "/examples/schunk_wsg/models/schunk_wsg_50.sdf");
 
   // Builds a world with two fixed tables.  A box is placed one on
   // table, and the iiwa arm is fixed to the other.
@@ -115,6 +117,10 @@ std::unique_ptr<systems::RigidBodyPlant<T>> BuildCombinedPlant(
       break;
     case 3:
       box_id = tree_builder->AddFloatingModelInstance("box_large", box_position,
+                                                      box_orientation);
+      break;
+    case 4:
+      box_id = tree_builder->AddFloatingModelInstance("box_extra_large", box_position,
                                                       box_orientation);
       break;
     default: DRAKE_ABORT_MSG("Chosen box should be between 0 and 4.");

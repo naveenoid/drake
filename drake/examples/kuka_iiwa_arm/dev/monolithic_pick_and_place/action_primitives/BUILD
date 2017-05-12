@@ -20,7 +20,7 @@ drake_cc_library(
         "gripper_action.h",
         "iiwa_move.h",
     ],
-    visibility = ["//drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place:__subpackages__"],
+    visibility = ["//drake/examples/kuka_iiwa_arm/dev:__subpackages__"],
     deps = [
         "//drake/examples/kuka_iiwa_arm:iiwa_common",
         "//drake/examples/kuka_iiwa_arm:iiwa_lcm",
