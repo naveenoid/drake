@@ -10,20 +10,20 @@ load(
 
 
 package(
-    default_visibility = ["//drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place:__subpackages__"],
+    default_visibility = ["//drake/examples/kuka_iiwa_arm/dev:__subpackages__"],
 )
 
 drake_cc_library(
     name = "kuka_whole_body_manipulation",
     srcs = [
-#        "demo_diagram_builder.cc",
-#        "whole_body_state_machine_system.cc",
+        "demo_diagram_builder.cc",
+        "scripted_state_machine_system.cc",
 #        "synchronous_world_state.cc",
     ],
     hdrs = [
         "demo_diagram_builder.h",
 #        "pick_and_place_common.h",
-#        "state_machine_system.h",
+        "scripted_state_machine_system.h",
 #        "synchronous_world_state.h",
     ],
     deps = [
@@ -33,9 +33,11 @@ drake_cc_library(
 #        "//drake/examples/kuka_iiwa_arm/dev/pick_and_place:kuka_pick_and_place",
       #  "//drake/examples/kuka_iiwa_arm/iiwa_world:iiwa_wsg_diagram_factory",
         "//drake/examples/kuka_iiwa_arm/iiwa_world:world_sim_tree_builder",
+        "//drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place:kuka_pick_and_place_monolithic",
 #        "//drake/examples/schunk_wsg:schunk_wsg_lcm",
-#        "//drake/lcm",
-#        "//drake/lcmtypes:iiwa",
+        "//drake/lcm",
+        "//drake/lcmtypes:iiwa",
+        "@bot_core_lcmtypes",
         "//drake/multibody:rigid_body_tree",
 #        "//drake/multibody/parsers",
     ],
@@ -57,6 +59,26 @@ drake_cc_binary(
             "//drake/lcm",
             "//drake/multibody/parsers",
             "//drake/systems/framework",
-            "@gflags",
+            "@com_github_gflags_gflags//:gflags",
+        ],
+)
+
+drake_cc_binary(
+    name = "whole_body_contact_manipulation_demo",
+    srcs = ["whole_body_contact_manipulation_demo.cc"],
+    data = [
+            "//drake/examples/kuka_iiwa_arm:models",
+            "//drake/manipulation/models/iiwa_description:models",
+        ],
+        test_rule_args = ["--num_configurations=1"],
+        deps = [
+            ":kuka_whole_body_manipulation",
+            "//drake/examples/kuka_iiwa_arm/dev/tools:simple_tree_visualizer",
+            "//drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place:kuka_pick_and_place_monolithic",
+            "//drake/common",
+            "//drake/lcm",
+            "//drake/multibody/parsers",
+            "//drake/systems/framework",
+            "@com_github_gflags_gflags//:gflags",
         ],
 )
