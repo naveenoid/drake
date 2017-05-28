@@ -189,7 +189,7 @@ IiwaPlantGeneratorsEstimatorsAndVisualizer
    * @param chosen_box : The choice of which box ...
    */
   IiwaPlantGeneratorsEstimatorsAndVisualizer(
-      lcm::DrakeLcm* lcm, const int chosen_box = 1,
+      lcm::DrakeLcm* lcm,
       const double update_interval = 0.001,
       Eigen::Vector3d box_position = Vector3<double>(1 + -0.43, -0.65,
                                                      kTableTopZInWorld + 0.1),

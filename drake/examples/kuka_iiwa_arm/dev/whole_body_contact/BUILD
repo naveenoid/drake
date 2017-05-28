@@ -24,6 +24,7 @@ drake_cc_library(
         "demo_diagram_builder.h",
 #        "pick_and_place_common.h",
         "scripted_state_machine_system.h",
+        "whole_body_common.h",
 #        "synchronous_world_state.h",
     ],
     deps = [
