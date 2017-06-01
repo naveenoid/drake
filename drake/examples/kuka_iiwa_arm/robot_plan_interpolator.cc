@@ -193,6 +193,7 @@ void RobotPlanInterpolator::DoCalcUnrestrictedUpdate(
         input_time.push_back(plan_input.plan[k].utime / 1e6);
       }
 
+      //// Add a cinstructor arguement to force the else.
       if (knots.size() >= 3) {
         const Eigen::MatrixXd knot_dot =
             Eigen::MatrixXd::Zero(tree_.get_num_velocities(), 1);

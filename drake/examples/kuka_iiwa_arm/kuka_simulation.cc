@@ -32,7 +32,8 @@
 
 DEFINE_double(simulation_sec, std::numeric_limits<double>::infinity(),
               "Number of seconds to simulate.");
-DEFINE_string(urdf, "", "Name of urdf to load");
+DEFINE_string(robot_urdf, "", "Name of robot urdf to load");
+DEFINE_string(target_urdf, "","Name of manipulation target urdf to load");
 
 namespace drake {
 namespace examples {
@@ -55,12 +56,13 @@ int DoMain() {
   RigidBodyPlant<double>* plant = nullptr;
   const std::string kModelPath = "/manipulation/models/iiwa_description/urdf/"
       "iiwa14_polytope_collision.urdf";
-  const std::string urdf = (!FLAGS_urdf.empty() ? FLAGS_urdf :
+  const std::string robot_urdf = (
+      !FLAGS_robot_urdf.empty() ? GetDrakePath() + FLAGS_robot_urdf :
                             GetDrakePath() + kModelPath);
   {
     auto tree = std::make_unique<RigidBodyTree<double>>();
     parsers::urdf::AddModelInstanceFromUrdfFileToWorld(
-        urdf, multibody::joints::kFixed, tree.get());
+        robot_urdf, multibody::joints::kFixed, tree.get());
     plant = builder.AddPlant(std::move(tree));
   }
   // Creates and adds LCM publisher for visualization.
@@ -92,7 +94,7 @@ int DoMain() {
   auto controller =
       builder.AddController<systems::InverseDynamicsController<double>>(
           RigidBodyTreeConstants::kFirstNonWorldModelInstanceId,
-          urdf, nullptr, iiwa_kp, iiwa_ki, iiwa_kd,
+          robot_urdf, nullptr, iiwa_kp, iiwa_ki, iiwa_kd,
           false /* without feedforward acceleration */);
 
   // Create the command subscriber and status publisher.
