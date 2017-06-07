@@ -18,6 +18,7 @@ drake_cc_library(
     srcs = [
         "demo_diagram_builder.cc",
         "scripted_state_machine_system.cc",
+        "iiwa_diagram_factory.h",
 #        "synchronous_world_state.cc",
     ],
     hdrs = [
@@ -25,6 +26,7 @@ drake_cc_library(
 #        "pick_and_place_common.h",
         "scripted_state_machine_system.h",
         "whole_body_common.h",
+        "iiwa_diagram_factory.cc",
 #        "synchronous_world_state.h",
     ],
     deps = [

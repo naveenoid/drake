@@ -4,6 +4,7 @@
 
 #include "drake/common/drake_path.h"
 #include "drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place/pick_and_place_common.h"
+#include "drake/examples/kuka_iiwa_arm/dev/whole_body_contact/iiwa_diagram_factory.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_lcm.h"
 #include "drake/lcm/drake_lcm.h"
 #include "drake/multibody/rigid_body_plant/drake_visualizer.h"
@@ -18,10 +19,8 @@ using lcm::DrakeLcm;
 using systems::RigidBodyPlant;
 
 namespace examples {
-using manipulation::schunk_wsg::SchunkWsgTrajectoryGenerator;
-using manipulation::schunk_wsg::SchunkWsgStatusSender;
-
 namespace kuka_iiwa_arm {
+using monolithic_pick_and_place::IiwaMove;
 namespace whole_body_contact {
 
 template <typename T>
@@ -44,27 +43,27 @@ StateMachineAndPrimitives<T>::StateMachineAndPrimitives(
   Isometry3<T> iiwa_base = Isometry3<T>::Identity();
   iiwa_base.translation() = kRobotBase;
 
-  pick_and_place_state_machine_ =
-      builder.template AddSystem<PickAndPlaceStateMachineSystem>(iiwa_base);
-  pick_and_place_state_machine_->set_name("PickAndPlaceStateMachine");
+  whole_body_state_machine_ =
+      builder.template AddSystem<ScriptedStateMachineSystem>(iiwa_base);
+  whole_body_state_machine_->set_name("PickAndPlaceStateMachine");
 
   input_port_iiwa_robot_state_t_ = builder.ExportInput(
-      pick_and_place_state_machine_->get_input_port_iiwa_state());
+      whole_body_state_machine_->get_input_port_iiwa_state());
 
   input_port_box_robot_state_t_ = builder.ExportInput(
-      pick_and_place_state_machine_->get_input_port_box_state());
+      whole_body_state_machine_->get_input_port_box_state());
 //
 //  input_port_wsg_status_ = builder.ExportInput(
 //      pick_and_place_state_machine_->get_input_port_wsg_status());
 
-  builder.Connect(pick_and_place_state_machine_->get_output_port_iiwa_action(),
+  builder.Connect(whole_body_state_machine_->get_output_port_iiwa_action(),
                   iiwa_move_->get_primitive_input_port());
 //  builder.Connect(pick_and_place_state_machine_->get_output_port_wsg_action(),
 //                  gripper_action_->get_primitive_input_port());
 
   builder.Connect(
       iiwa_move_->get_status_output_port(),
-      pick_and_place_state_machine_->get_input_port_iiwa_action_status());
+      whole_body_state_machine_->get_input_port_iiwa_action_status());
 
 //  builder.Connect(
 //      gripper_action_->get_status_output_port(),
@@ -80,24 +79,28 @@ StateMachineAndPrimitives<T>::StateMachineAndPrimitives(
 template class StateMachineAndPrimitives<double>;
 
 template <typename T>
-IiwaWsgPlantGeneratorsEstimatorsAndVisualizer<T>::
-IiwaWsgPlantGeneratorsEstimatorsAndVisualizer(
+IiwaPlantGeneratorsEstimatorsAndVisualizer<T>::
+IiwaPlantGeneratorsEstimatorsAndVisualizer(
     DrakeLcm* lcm, const double update_interval,
     Eigen::Vector3d box_position, Eigen::Vector3d box_orientation) {
-  this->set_name("IiwaWsgPlantGeneratorsEstimatorsAndVisualizer");
+  this->set_name("IiwaPlantGeneratorsEstimatorsAndVisualizer");
 
   DiagramBuilder<T> builder;
-  ModelInstanceInfo<double> iiwa_instance, wsg_instance, box_instance;
+  ModelInstanceInfo<double> iiwa_instance, box_instance;
 
   std::unique_ptr<systems::RigidBodyPlant<double>> model_ptr =
-      BuildCombinedPlant<double>(&iiwa_instance, &wsg_instance, &box_instance,
-                                 chosen_box, box_position, box_orientation);
-  plant_ = builder.template AddSystem<IiwaAndWsgPlantWithStateEstimator<T>>(
-      std::move(model_ptr), iiwa_instance, wsg_instance, box_instance);
+      BuildCombinedPlant<double>(&iiwa_instance, &box_instance,
+                                 box_position, box_orientation);
+
+  std::cout<<"About to move the plant into the IIWAPlantwithStateEstimator\n";
+  plant_ = builder.template AddSystem<IiwaPlantWithStateEstimator<T>>(
+      std::move(model_ptr), iiwa_instance, box_instance);
+  std::cout<<"Got here 1\n";
   plant_->set_name("plant");
 
   drake_visualizer_ = builder.template AddSystem<DrakeVisualizer>(
       plant_->get_plant().get_rigid_body_tree(), lcm);
+  std::cout<<"Got here 2\n";
   drake_visualizer_->set_name("drake_visualizer");
 
   builder.Connect(plant_->get_output_port_plant_state(),
@@ -105,7 +108,7 @@ IiwaWsgPlantGeneratorsEstimatorsAndVisualizer(
 
   iiwa_trajectory_generator_ =
       builder.template AddSystem<RobotPlanInterpolator>(
-          drake::GetDrakePath() + kIiwaUrdf, update_interval);
+          drake::GetDrakePath() + monolithic_pick_and_place::kIiwaUrdf, update_interval);
   iiwa_trajectory_generator_->set_name("iiwa_trajectory_generator");
 
   builder.Connect(plant_->get_output_port_iiwa_state(),
@@ -151,7 +154,7 @@ IiwaWsgPlantGeneratorsEstimatorsAndVisualizer(
 }
 
 template <typename T>
-void IiwaWsgPlantGeneratorsEstimatorsAndVisualizer<T>::InitializeIiwaPlan(
+void IiwaPlantGeneratorsEstimatorsAndVisualizer<T>::InitializeIiwaPlan(
     const VectorX<T>& q0, systems::Context<T>* context) const {
   auto plan_source_context =
       this->GetMutableSubsystemContext(
@@ -162,7 +165,7 @@ void IiwaWsgPlantGeneratorsEstimatorsAndVisualizer<T>::InitializeIiwaPlan(
 }
 
 
-template class IiwaWsgPlantGeneratorsEstimatorsAndVisualizer<double>;
+template class IiwaPlantGeneratorsEstimatorsAndVisualizer<double>;
 
 }  // namespace whole_body_contact
 }  // namespace kuka_iiwa_arm

@@ -41,7 +41,7 @@ class IiwaPlantWithStateEstimator : public systems::Diagram<T> {
   /// object. The arguments `iiwa_info`, and `box_info` are the
   /// `ModelInstanceInfo` objects corresponding to the Kuka IIWA, Schunk WSG
   /// and the box object respectively.
-  IiwaAPlantWithStateEstimator(
+  IiwaPlantWithStateEstimator(
       std::unique_ptr<systems::RigidBodyPlant<T>> combined_plant,
       const ModelInstanceInfo<T>& iiwa_info,
       const ModelInstanceInfo<T>& box_info);

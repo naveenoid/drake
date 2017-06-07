@@ -26,7 +26,6 @@
 
 DEFINE_double(simulation_sec, std::numeric_limits<double>::infinity(),
 "Number of seconds to simulate.");
-DEFINE_uint64(box_choice, 1, "ID of the box to pick.");
 DEFINE_double(orientation, 2 * M_PI, "Yaw angle of the box.");
 
 
@@ -46,9 +45,9 @@ int DoMain(void) {
   systems::DiagramBuilder<double> builder;
 
   auto plant = builder.template AddSystem<
-  IiwaWsgPlantGeneratorsEstimatorsAndVisualizer<double>>(
-      std::make_unique<IiwaWsgPlantGeneratorsEstimatorsAndVisualizer<double>>(
-          &lcm, FLAGS_box_choice, 0.001, Vector3<double>(
+  IiwaPlantGeneratorsEstimatorsAndVisualizer<double>>(
+      std::make_unique<IiwaPlantGeneratorsEstimatorsAndVisualizer<double>>(
+          &lcm, 0.001, Vector3<double>(
               1 + -0.43, -0.65, kTableTopZInWorld + 0.1),
           Vector3<double>(0, 0, FLAGS_orientation) ));
 
@@ -57,7 +56,7 @@ int DoMain(void) {
       kRobotBase, Eigen::Vector3d::Zero());
 
   RigidBodyTree<double> iiwa;
-  parsers::urdf::AddModelInstanceFromUrdfFile(drake::GetDrakePath() + kIiwaUrdf,
+  parsers::urdf::AddModelInstanceFromUrdfFile(drake::GetDrakePath() + monolithic_pick_and_place::kIiwaUrdf,
                                               multibody::joints::kFixed,
                                               iiwa_base_frame, &iiwa);
 

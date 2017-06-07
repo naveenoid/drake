@@ -1,4 +1,4 @@
-#include "drake/examples/kuka_iiwa_arm/iiwa_world/iiwa_wsg_diagram_factory.h"
+#include "drake/examples/kuka_iiwa_arm/dev/whole_body_contact/iiwa_diagram_factory.h"
 
 #include <map>
 #include <memory>
@@ -10,7 +10,6 @@
 #include "drake/examples/kuka_iiwa_arm/iiwa_world/world_sim_tree_builder.h"
 #include "drake/examples/kuka_iiwa_arm/oracular_state_estimator.h"
 #include "drake/examples/kuka_iiwa_arm/sim_diagram_builder.h"
-#include "drake/examples/schunk_wsg/schunk_wsg_constants.h"
 #include "drake/multibody/rigid_body_plant/rigid_body_plant.h"
 #include "drake/systems/controllers/inverse_dynamics_controller.h"
 #include "drake/systems/controllers/pid_controller.h"
@@ -31,30 +30,29 @@ using systems::RigidBodyPlant;
 
 namespace examples {
 namespace kuka_iiwa_arm {
+namespace whole_body_contact {
+
 
 template <typename T>
-IiwaAndWsgPlantWithStateEstimator<T>::IiwaAndWsgPlantWithStateEstimator(
+IiwaPlantWithStateEstimator<T>::IiwaPlantWithStateEstimator(
     std::unique_ptr<RigidBodyPlant<T>> combined_plant,
-    const ModelInstanceInfo<T>& iiwa_info, const ModelInstanceInfo<T>& wsg_info,
+    const ModelInstanceInfo<T>& iiwa_info,
     const ModelInstanceInfo<T>& box_info) {
-  this->set_name("IiwaAndWsgPlantWithStateEstimator");
+  this->set_name("IiwaPlantWithStateEstimator");
 
   SimDiagramBuilder<T> builder;
   DiagramBuilder<T>* base_builder = builder.get_mutable_builder();
 
   plant_ = builder.AddPlant(std::move(combined_plant));
-  plant_->set_name("IiwaAndWsgCombinedPlant");
+  plant_->set_name("IiwaPlant");
 
   const auto& iiwa_output_port =
       plant_->model_instance_state_output_port(iiwa_info.instance_id);
 
-  const auto& wsg_output_port =
-      plant_->model_instance_state_output_port(wsg_info.instance_id);
-
   VectorX<double> iiwa_kp, iiwa_kd, iiwa_ki;
   SetPositionControlledIiwaGains(&iiwa_kp, &iiwa_ki, &iiwa_kd);
   // Uses integral gains to deal with the added mass from the grasped object.
-  iiwa_ki << 1, 1, 1, 1, 1, 1, 1;
+  //iiwa_ki << 1, 1, 1, 1, 1, 1, 1;
 
   // Exposing feedforward acceleration. Should help with more dynamic
   // motions.
@@ -63,17 +61,17 @@ IiwaAndWsgPlantWithStateEstimator<T>::IiwaAndWsgPlantWithStateEstimator(
           iiwa_info.instance_id, iiwa_info.model_path, iiwa_info.world_offset,
           iiwa_kp, iiwa_ki, iiwa_kd, true /* with feedforward acceleration */);
   iiwa_controller_->set_name("IIWAInverseDynamicsController");
-
-  // Updates the controller's model's end effector's inertia to include
-  // the added gripper.
-  const std::string kEndEffectorLinkName = "iiwa_link_7";
-  Matrix6<T> lumped_gripper_inertia_EE =
-      ComputeLumpedGripperInertiaInEndEffectorFrame(
-          plant_->get_rigid_body_tree(), iiwa_info.instance_id,
-          kEndEffectorLinkName, wsg_info.instance_id);
-  RigidBody<T>* controller_ee =
-      iiwa_controller_->get_robot_for_control().FindBody(kEndEffectorLinkName);
-  controller_ee->set_spatial_inertia(lumped_gripper_inertia_EE);
+//
+//  // Updates the controller's model's end effector's inertia to include
+//  // the added gripper.
+//  const std::string kEndEffectorLinkName = "iiwa_link_7";
+//  Matrix6<T> lumped_gripper_inertia_EE =
+//      ComputeLumpedGripperInertiaInEndEffectorFrame(
+//          plant_->get_rigid_body_tree(), iiwa_info.instance_id,
+//          kEndEffectorLinkName, wsg_info.instance_id);
+//  RigidBody<T>* controller_ee =
+//      iiwa_controller_->get_robot_for_control().FindBody(kEndEffectorLinkName);
+//  controller_ee->set_spatial_inertia(lumped_gripper_inertia_EE);
 
   // Export iiwa's desired state input, and state output.
   input_port_iiwa_state_command_ = base_builder->ExportInput(
@@ -81,28 +79,28 @@ IiwaAndWsgPlantWithStateEstimator<T>::IiwaAndWsgPlantWithStateEstimator(
   input_port_iiwa_acceleration_command_ = base_builder->ExportInput(
       iiwa_controller_->get_input_port_desired_acceleration());
   output_port_iiwa_state_ = base_builder->ExportOutput(iiwa_output_port);
-
-  // Sets up the WSG gripper part.
-  std::unique_ptr<systems::MatrixGain<T>> feedback_selector =
-      std::make_unique<systems::MatrixGain<T>>(
-          schunk_wsg::GetSchunkWsgFeedbackSelector<T>());
+//
+//  // Sets up the WSG gripper part.
+//  std::unique_ptr<systems::MatrixGain<T>> feedback_selector =
+//      std::make_unique<systems::MatrixGain<T>>(
+//          schunk_wsg::GetSchunkWsgFeedbackSelector<T>());
   // TODO(sam.creasey) The choice of position gains below is completely
   // arbitrary. We'll need to revisit this once we switch to force control
   // for the gripper.
-  const int kWsgActDim = schunk_wsg::kSchunkWsgNumActuators;
-  const VectorX<T> wsg_kp = VectorX<T>::Constant(kWsgActDim, 300.0);
-  const VectorX<T> wsg_ki = VectorX<T>::Constant(kWsgActDim, 0.0);
-  const VectorX<T> wsg_kd = VectorX<T>::Constant(kWsgActDim, 5.0);
+//  const int kWsgActDim = schunk_wsg::kSchunkWsgNumActuators;
+//  const VectorX<T> wsg_kp = VectorX<T>::Constant(kWsgActDim, 300.0);
+//  const VectorX<T> wsg_ki = VectorX<T>::Constant(kWsgActDim, 0.0);
+//  const VectorX<T> wsg_kd = VectorX<T>::Constant(kWsgActDim, 5.0);
 
-  wsg_controller_ = builder.template AddController<systems::PidController<T>>(
-      wsg_info.instance_id, std::move(feedback_selector), wsg_kp, wsg_ki,
-      wsg_kd);
-  wsg_controller_->set_name("SchunkWSGPIDController");
-
-  //  Export wsg's desired state input, and state output.
-  input_port_wsg_command_ = base_builder->ExportInput(
-      wsg_controller_->get_input_port_desired_state());
-  output_port_wsg_state_ = base_builder->ExportOutput(wsg_output_port);
+//  wsg_controller_ = builder.template AddController<systems::PidController<T>>(
+//      wsg_info.instance_id, std::move(feedback_selector), wsg_kp, wsg_ki,
+//      wsg_kd);
+//  wsg_controller_->set_name("SchunkWSGPIDController");
+//
+//  //  Export wsg's desired state input, and state output.
+//  input_port_wsg_command_ = base_builder->ExportInput(
+//      wsg_controller_->get_input_port_desired_state());
+//  output_port_wsg_state_ = base_builder->ExportOutput(wsg_output_port);
 
   output_port_plant_state_ =
       base_builder->ExportOutput(plant_->get_output_port(0));
@@ -137,8 +135,10 @@ IiwaAndWsgPlantWithStateEstimator<T>::IiwaAndWsgPlantWithStateEstimator(
 
   builder.BuildInto(this);
 }
-template class IiwaAndWsgPlantWithStateEstimator<double>;
+template class IiwaPlantWithStateEstimator<double>;
 
+
+} // namespace whole_body_contact
 }  // namespace kuka_iiwa_arm
 }  // namespace examples
 }  // namespace drake

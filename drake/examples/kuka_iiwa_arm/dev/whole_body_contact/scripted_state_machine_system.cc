@@ -154,10 +154,10 @@ void ScriptedStateMachineSystem::DoCalcUnrestrictedUpdate(
     const systems::Context<double>& context,
     systems::State<double>* state) const {
   // Extract Internal state.
-  InternalState& internal_state =
+  InternalState &internal_state =
       state->get_mutable_abstract_state<InternalState>(kStateIndex);
 
-  IiwaActionInput& iiwa_action_input = internal_state.iiwa_current_action;
+  IiwaActionInput &iiwa_action_input = internal_state.iiwa_current_action;
 
   /* Update world state from inputs. */
 //  const robot_state_t& iiwa_state =
@@ -166,7 +166,7 @@ void ScriptedStateMachineSystem::DoCalcUnrestrictedUpdate(
 //  const robot_state_t& box_state =
 //      this->EvalAbstractInput(context, input_port_box_state_)
 //          ->GetValue<robot_state_t>();
-  const ActionPrimitiveState& iiwa_primitive_state =
+  const ActionPrimitiveState &iiwa_primitive_state =
       this->EvalAbstractInput(context, input_port_iiwa_action_status_)
           ->GetValue<ActionPrimitiveState>();
 //
@@ -207,58 +207,59 @@ void ScriptedStateMachineSystem::DoCalcUnrestrictedUpdate(
         internal_state.iiwa_action_initiated = false;
         internal_state.pick_and_place_state = PickAndPlaceState::APPROACH_PICK;
 //      }
-      break;
-    case PickAndPlaceState::APPROACH_PICK:
-      if (!internal_state.iiwa_action_initiated) {
-        drake::log()->info("StateMachine : APPROACH_PICK at {}",
-                           context.get_time());
+        break;
+        case PickAndPlaceState::APPROACH_PICK:
+          if (!internal_state.iiwa_action_initiated) {
+            drake::log()->info("StateMachine : APPROACH_PICK at {}",
+                               context.get_time());
 
-        times.push_back(0);
-        times.push_back(2);
+            times.push_back(0);
+            times.push_back(2);
 
-        q_des.push_back(kJointSequence.row(1));
-        q_des.push_back(kJointSequence.row(2));
+            q_des.push_back(kJointSequence.row(1));
+            q_des.push_back(kJointSequence.row(2));
 
-        internal_state.iiwa_action_initiated = true;
-        iiwa_action_input.is_valid = true;
-        iiwa_action_input.time = times;
-        iiwa_action_input.q = q_des;
+            internal_state.iiwa_action_initiated = true;
+            iiwa_action_input.is_valid = true;
+            iiwa_action_input.time = times;
+            iiwa_action_input.q = q_des;
 
-      } else if (iiwa_primitive_state == ActionPrimitiveState::WAITING) {
-        // This means that the action was already intiated and primitive
-        // has returned to WAITING state, i.e. it is complete.
-        // resetting iiwa_action.
-        times.clear();
-        q_des.clear();
+          } else if (iiwa_primitive_state == ActionPrimitiveState::WAITING) {
+            // This means that the action was already intiated and primitive
+            // has returned to WAITING state, i.e. it is complete.
+            // resetting iiwa_action.
+            times.clear();
+            q_des.clear();
 
-        internal_state.iiwa_action_initiated = false;
-        internal_state.pick_and_place_state = PickAndPlaceState::GRASP;
-      }
-      break;
-    case PickAndPlaceState::GRASP:
-      // change output to gripper action primitive.
-      if (!internal_state.iiwa_action_initiated) {
+            internal_state.iiwa_action_initiated = false;
+            internal_state.pick_and_place_state = PickAndPlaceState::GRASP;
+          }
+        break;
+        case PickAndPlaceState::GRASP:
+          // change output to gripper action primitive.
+          if (!internal_state.iiwa_action_initiated) {
 //        // Perform wsg action.
-        drake::log()->info("StateMachine : GRASP at {}", context.get_time());
+            drake::log()->info("StateMachine : GRASP at {}", context.get_time());
 
-        times.push_back(0);
-        times.push_back(2);
+            times.push_back(0);
+            times.push_back(2);
 
-        q_des.push_back(kJointSequence.row(2));
-        q_des.push_back(kJointSequence.row(3));
+            q_des.push_back(kJointSequence.row(2));
+            q_des.push_back(kJointSequence.row(3));
 
-        internal_state.iiwa_action_initiated = true;
-        iiwa_action_input.is_valid = true;
-        iiwa_action_input.time = times;
-        iiwa_action_input.q = q_des;
-      } else if (iiwa_primitive_state == ActionPrimitiveState::WAITING) {
+            internal_state.iiwa_action_initiated = true;
+            iiwa_action_input.is_valid = true;
+            iiwa_action_input.time = times;
+            iiwa_action_input.q = q_des;
+          } else if (iiwa_primitive_state == ActionPrimitiveState::WAITING) {
 //        // This means that the action was already intiated and primitive
 //        // has returned to WAITING state, i.e. it is complete.
 //        // resetting wsg_action.
-        internal_state.iiwa_action_initiated = false;
+            internal_state.iiwa_action_initiated = false;
 //        internal_state.pick_and_place_state = PickAndPlaceState::LIFT_FROM_PICK;
+          }
+        break;
       }
-      break;
   }
 }
 

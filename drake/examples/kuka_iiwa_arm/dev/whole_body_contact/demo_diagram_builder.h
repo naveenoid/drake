@@ -7,13 +7,14 @@
 #include "drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place/pick_and_place_common.h"
 #include "drake/examples/kuka_iiwa_arm/dev/whole_body_contact/scripted_state_machine_system.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_lcm.h"
-#include "drake/examples/kuka_iiwa_arm/iiwa_world/iiwa_wsg_diagram_factory.h"
+#include "drake/examples/kuka_iiwa_arm/dev/whole_body_contact/iiwa_diagram_factory.h"
 #include "drake/examples/kuka_iiwa_arm/robot_plan_interpolator.h"
 #include "drake/lcm/drake_lcm.h"
 #include "drake/multibody/rigid_body_plant/drake_visualizer.h"
 #include "drake/multibody/rigid_body_plant/rigid_body_plant.h"
 #include "drake/multibody/rigid_body_tree.h"
 #include "drake/systems/framework/diagram.h"
+
 
 namespace drake {
 
@@ -221,7 +222,7 @@ IiwaPlantGeneratorsEstimatorsAndVisualizer
                           systems::Context<T>* context) const;
 
  private:
-  IiwaAndWsgPlantWithStateEstimator<T>* plant_{nullptr};
+  IiwaPlantWithStateEstimator<T>* plant_{nullptr};
   systems::DrakeVisualizer* drake_visualizer_{nullptr};
   RobotPlanInterpolator* iiwa_trajectory_generator_{nullptr};
 
