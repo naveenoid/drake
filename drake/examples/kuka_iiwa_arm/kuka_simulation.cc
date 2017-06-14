@@ -32,9 +32,8 @@
 
 DEFINE_double(simulation_sec, std::numeric_limits<double>::infinity(),
               "Number of seconds to simulate.");
-DEFINE_string(robot_urdf, "", "Name of urdf to load");
+DEFINE_string(robot_urdf, "", "Name of robot urdf to load");
 DEFINE_string(target_urdf, "","Name of manipulation target urdf to load");
-DEFINE_string(trajectory_file, "", "Name of the file with the trajectory");
 
 namespace drake {
 namespace examples {

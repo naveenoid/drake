@@ -1,5 +1,6 @@
 #include "drake/examples/kuka_iiwa_arm/dev/tools/geometric_contact_state_estimator.h"
 #include "drake/multibody/rigid_body_plant/rigid_body_plant.h"
+#include "drake/multibody/rigid_body_plant/contact_info.h"
 
 namespace drake {
 namespace examples {
@@ -7,21 +8,21 @@ namespace kuka_iiwa_arm {
 namespace tools {
 
 template <typename T>
-GeometricContactStateEstimator::GeometricContactStateEstimator(
+GeometricContactStateEstimator<T>::GeometricContactStateEstimator(
     std::unique_ptr<RigidBodyTree<T>> tree) :
-    rigid_body_tree_(std::move(tree)) {
+    tree_(std::move(tree)) {
 
 }
 
 template <typename T>
-systems::ContactResults<T> GeometricContactStateEstimator::ComputeContactResults(const VectorX<T> &x) {
+systems::ContactResults<T> GeometricContactStateEstimator<T>::ComputeContactResults(const VectorX<T> &x) {
 
   systems::ContactResults<T> contact_results;
-  const int nq = rigid_body_tree_->get_num_positions();
-  const int nv = rigid_body_tree_->get_num_velocities();
+  const int nq = tree_->get_num_positions();
+  const int nv = tree_->get_num_velocities();
   VectorX<T> q = x.topRows(nq);
   VectorX<T> v = x.bottomRows(nv);
-  auto kinsol = rigid_body_tree_->doKinematics(q, v);
+  auto kinsol = tree_->doKinematics(q, v);
 
   using std::sqrt;
 
@@ -29,7 +30,7 @@ systems::ContactResults<T> GeometricContactStateEstimator::ComputeContactResults
   // Unfortunately collisionDetect() modifies the collision model in the RBT
   // when updating the collision element poses.
   std::vector<DrakeCollision::PointPair> pairs =
-      rigid_body_tree_->ComputeMaximumDepthCollisionPoints(kinsol, true);
+      tree_->ComputeMaximumDepthCollisionPoints(kinsol, true);
 
   VectorX<T> contact_force(kinsol.getV().rows(), 1);
   contact_force.setZero();
@@ -114,7 +115,7 @@ systems::ContactResults<T> GeometricContactStateEstimator::ComputeContactResults
       const T kNonZeroSqd = T(1e-14 * 1e-14);
       if (slip_speed_squared > kNonZeroSqd) {
         const T slip_speed = sqrt(slip_speed_squared);
-        const T friction_coefficient = ComputeFrictionCoefficient(slip_speed);
+        const T friction_coefficient = ComputeFrictionCoefficient<T>(slip_speed);
         const T fF = friction_coefficient * fN;
         fA.template head<2>() = -(fF / slip_speed) *
             slip_vector;
@@ -131,13 +132,13 @@ systems::ContactResults<T> GeometricContactStateEstimator::ComputeContactResults
       // this term needs to be subtracted.
       contact_force += J.transpose() * fA;
       if (contacts != nullptr) {
-        ContactInfo<T>& contact_info = contacts->AddContact(
+        systems::ContactInfo<T>& contact_info = contacts->AddContact(
             pair.elementA->getId(), pair.elementB->getId());
 
         // TODO(SeanCurtis-TRI): Future feature: test against user-set flag
         // for whether the details should generally be captured or not and
         // make this function dependent.
-        vector<unique_ptr<ContactDetail<T>>> details;
+        std::vector<std::unique_ptr<systems::ContactDetail<T>>> details;
         ContactResultantForceCalculator<T> calculator(&details);
 
         // This contact model produces responses that only have a force
@@ -162,8 +163,50 @@ systems::ContactResults<T> GeometricContactStateEstimator::ComputeContactResults
 
 }
 
+template <typename T>
+T GeometricContactStateEstimator<T>::ComputeFrictionCoefficient(T v_tangent_BAc) {
+  DRAKE_ASSERT(v_tangent_BAc >= 0);
+  const T v = v_tangent_BAc * inv_v_stiction_tolerance_;
+  if (v >= 3) {
+    return dynamic_friction_ceof_;
+  } else if (v >= 1) {
+    return static_friction_coef_ -
+        (static_friction_coef_ - dynamic_friction_ceof_) *
+            step5((v - 1) / 2);
+  } else {
+    return static_friction_coef_ * step5(v);
+  }
 }
+
+
+template <typename T>
+Matrix3<T> GeometricContactStateEstimator<T>::ComputeBasisFromZ(const Vector3<T>& z_axis_W) {
+  // Projects the z-axis into the first quadrant in order to identify the
+  // *smallest* component of the normal.
+  const Vector3<T> u(z_axis_W.cwiseAbs());
+  int minAxis;
+  u.minCoeff(&minAxis);
+  // The world axis corresponding to the smallest component of the local
+  // z-axis will be *most* perpendicular.
+  Vector3<T> perpAxis;
+  perpAxis << (minAxis == 0 ? 1 : 0), (minAxis == 1 ? 1 : 0),
+      (minAxis == 2 ? 1 : 0);
+  // Now define x- and y-axes.
+  Vector3<T> x_axis_W = z_axis_W.cross(perpAxis).normalized();
+  Vector3<T> y_axis_W = z_axis_W.cross(x_axis_W);
+  // Transformation from world frame to local frame.
+  Matrix3<T> R_WL;
+  R_WL.col(0) = x_axis_W;
+  R_WL.col(1) = y_axis_W;
+  R_WL.col(2) = z_axis_W;
+  return R_WL;
 }
-}
-}
+
+
+template class GeometricContactStateEstimator<double>;
+
+} // namespace tools
+} // namespace kuka_iiwa_arm
+} // namespace examples
+} // namespace drake
 

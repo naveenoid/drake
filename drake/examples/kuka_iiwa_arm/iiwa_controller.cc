@@ -6,6 +6,7 @@
 
 #include <gflags/gflags.h>
 #include "robotlocomotion/robot_plan_t.hpp"
+#include <fstream>
 
 #include "drake/common/drake_path.h"
 #include "drake/common/text_logging.h"
@@ -23,18 +24,46 @@
 #include "drake/systems/lcm/lcm_publisher_system.h"
 #include "drake/systems/lcm/lcm_subscriber_system.h"
 #include "drake/systems/primitives/demultiplexer.h"
+#include "drake/common/eigen_types.h"
 
 using robotlocomotion::robot_plan_t;
 
 DEFINE_string(urdf, "", "Name of urdf to load");
+DEFINE_string(trajectory_file, "", "Name of the file with the trajectory");
+DEFINE_bool(pre_load_trajectory, FALSE, "Use a pre-loaded trajectory");
+DEFINE_bool(disable_third_order_interpolation, FALSE,
+"Disable interpolating points with a third-order polynomial");
+DEFINE_double(total_time, 15, "Total simulation time");
 
 namespace drake {
 namespace examples {
 namespace kuka_iiwa_arm {
 namespace {
 
+
+template<typename M>
+M load_csv (const std::string & csv_file_path) {
+  std::ifstream indata;
+  indata.open(csv_file_path);
+  std::string line;
+  std::vector<double> values;
+  uint rows = 0;
+  while (std::getline(indata, line)) {
+    std::stringstream lineStream(line);
+    std::string cell;
+    while (std::getline(lineStream, cell, ',')) {
+      values.push_back(std::stod(cell));
+    }
+    ++rows;
+  }
+  return Eigen::Map<const Eigen::Matrix<typename M::Scalar, M::RowsAtCompileTime, M::ColsAtCompileTime, Eigen::RowMajor>>(values.data(), rows, values.size()/rows);
+}
+
+
 const char* const kIiwaUrdf = "/manipulation/models/iiwa_description/urdf/"
     "iiwa14_polytope_collision.urdf";
+const char* const kTrajFile = "/examples/kuka_iiwa_arm/keyframes/dual_arm_ik_trajectory.dat";
+
 const char* const kLcmStatusChannel = "IIWA_STATUS";
 const char* const kLcmCommandChannel = "IIWA_COMMAND";
 const char* const kLcmPlanChannel = "COMMITTED_ROBOT_PLAN";
@@ -45,12 +74,39 @@ int DoMain() {
   lcm::DrakeLcm lcm;
   systems::DiagramBuilder<double> builder;
 
-  auto plan_sub =
-      builder.AddSystem(systems::lcm::LcmSubscriberSystem::Make<robot_plan_t>(
-          kLcmPlanChannel, &lcm));
-  plan_sub->set_name("plan_sub");
+  Eigen::MatrixXd trajectory;
 
-  const std::string urdf = (!FLAGS_urdf.empty() ? FLAGS_urdf :
+  std::unique_ptr<systems::lcm::LcmSubscriberSystem> plan_sub;
+
+  if(FLAGS_pre_load_trajectory) {
+
+    const Eigen::MatrixXd
+        q = !FLAGS_trajectory_.empty() ? load_csv<Eigen::MatrixXd>(GetDakePath() + kTrajFile) :
+                     load_csv<Eigen::MatrixXd>(GetDakePath() + FLAGS_trajectory_file);
+
+    const int kNumKeyFrames = q.rows();
+    std::vector<double> time;
+    double sum = 0;
+    for(size_t i = 0; i<kNumKeyFrames; ++i) {
+      time.push_back(sum);
+      sum += (1.0 / time.size()) * FLAGS_total_time;
+    }
+
+    std::vector<int> info(time.size(), 1);
+    MatrixX<double> q_mat(q.front().size(), q.size());
+    for (size_t i = 0; i < q.size(); ++i) q_mat.col(i) = q[i];
+    robotlocomotion::robot_plan_t *plan = EncodeKeyFrames(iiwa, time, info, q_mat);
+    StartAction(est_state.get_iiwa_time());
+    duration_ = time.back();
+  } else {
+    plan_sub =
+        builder.AddSystem(systems::lcm::LcmSubscriberSystem::Make<robot_plan_t>(
+            kLcmPlanChannel, &lcm));
+    plan_sub->set_name("plan_sub");
+  }
+
+  const std::string urdf = (
+      !FLAGS_urdf.empty() ? GetDrakePath() + FLAGS_urdf :
                             GetDrakePath() + kIiwaUrdf);
   auto plan_source =
       builder.AddSystem<RobotPlanInterpolator>(urdf);
@@ -77,8 +133,12 @@ int DoMain() {
   auto command_sender = builder.AddSystem<IiwaCommandSender>(num_joints);
   command_sender->set_name("command_sender");
 
-  builder.Connect(plan_sub->get_output_port(0),
-                  plan_source->get_plan_input_port());
+  if(FLAGS_pre_load_trajectory) {
+
+  } else {
+    builder.Connect(plan_sub->get_output_port(0),
+                    plan_source->get_plan_input_port());
+  }
   builder.Connect(status_sub->get_output_port(0),
                   status_receiver->get_input_port(0));
   builder.Connect(status_receiver->get_measured_position_output_port(),
