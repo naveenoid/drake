@@ -10,7 +10,7 @@
 namespace drake {
 namespace examples {
 namespace kuka_iiwa_arm {
-namespace tools {
+namespace contact_state_estimator {
 
 template <typename T>
 class GeometricContactStateEstimator {
@@ -18,12 +18,14 @@ class GeometricContactStateEstimator {
   GeometricContactStateEstimator(
       std::unique_ptr<RigidBodyTree<T>> tree);
 
-  systems::ContactResults<T> ComputeContactResults(const VectorX<T>& x );
+  void ComputeContactResults(const VectorX<T>& x,
+                             systems::ContactResults<T>* contact_results );
 
  private:
   T ComputeFrictionCoefficient(T v_tangent_BAc);
   Matrix3<T> ComputeBasisFromZ(const Vector3<T>& z_axis_W);
   std::unique_ptr<RigidBodyTree<T>> tree_;
+  T step5(T x);
 
 
   // Some parameters defining the contact.
@@ -40,7 +42,7 @@ class GeometricContactStateEstimator {
   T dynamic_friction_ceof_{0.5};
 };
 
-} // namespace tools
+} // namespace contact_state_estimator
 } // namespace kuka_iiwa_arm
 } // namespace examples
 } // namespace drake

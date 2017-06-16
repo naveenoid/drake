@@ -1,11 +1,12 @@
 #include "drake/examples/kuka_iiwa_arm/dev/contact_state_estimator/geometric_contact_state_estimator.h"
 #include "drake/multibody/rigid_body_plant/rigid_body_plant.h"
 #include "drake/multibody/rigid_body_plant/contact_info.h"
+#include "drake/multibody/rigid_body_plant/contact_resultant_force_calculator.h"
 
 namespace drake {
 namespace examples {
 namespace kuka_iiwa_arm {
-namespace tools {
+namespace contact_state_estimator {
 
 template <typename T>
 GeometricContactStateEstimator<T>::GeometricContactStateEstimator(
@@ -15,9 +16,10 @@ GeometricContactStateEstimator<T>::GeometricContactStateEstimator(
 }
 
 template <typename T>
-systems::ContactResults<T> GeometricContactStateEstimator<T>::ComputeContactResults(const VectorX<T> &x) {
+void GeometricContactStateEstimator<T>::ComputeContactResults(
+    const VectorX<T> &x, systems::ContactResults<T>* contact_results) {
 
-  systems::ContactResults<T> contact_results;
+  ;
   const int nq = tree_->get_num_positions();
   const int nv = tree_->get_num_velocities();
   VectorX<T> q = x.topRows(nq);
@@ -115,7 +117,7 @@ systems::ContactResults<T> GeometricContactStateEstimator<T>::ComputeContactResu
       const T kNonZeroSqd = T(1e-14 * 1e-14);
       if (slip_speed_squared > kNonZeroSqd) {
         const T slip_speed = sqrt(slip_speed_squared);
-        const T friction_coefficient = ComputeFrictionCoefficient<T>(slip_speed);
+        const T friction_coefficient = ComputeFrictionCoefficient(slip_speed);
         const T fF = friction_coefficient * fN;
         fA.template head<2>() = -(fF / slip_speed) *
             slip_vector;
@@ -130,16 +132,17 @@ systems::ContactResults<T> GeometricContactStateEstimator<T>::ComputeContactResu
       // Since right_hand_side has a negative sign when on the RHS of the
       // system of equations ([H,-J^T] * [vdot;f] + right_hand_side = 0),
       // this term needs to be subtracted.
+
       contact_force += J.transpose() * fA;
       if (contacts != nullptr) {
-        systems::ContactInfo<T>& contact_info = contacts->AddContact(
+        systems::ContactInfo<T>& contact_info = contact_results->AddContact(
             pair.elementA->getId(), pair.elementB->getId());
 
         // TODO(SeanCurtis-TRI): Future feature: test against user-set flag
         // for whether the details should generally be captured or not and
         // make this function dependent.
         std::vector<std::unique_ptr<systems::ContactDetail<T>>> details;
-        ContactResultantForceCalculator<T> calculator(&details);
+        systems::ContactResultantForceCalculator<T> calculator(&details);
 
         // This contact model produces responses that only have a force
         // component (i.e., the torque portion of the wrench is zero.)
@@ -158,9 +161,7 @@ systems::ContactResults<T> GeometricContactStateEstimator<T>::ComputeContactResu
       }
     }
   }
-
-  // return contact_force;
-
+//  return contact_results;
 }
 
 template <typename T>
@@ -203,9 +204,17 @@ Matrix3<T> GeometricContactStateEstimator<T>::ComputeBasisFromZ(const Vector3<T>
 }
 
 
+template <typename T>
+T GeometricContactStateEstimator<T>::step5(T x) {
+  DRAKE_ASSERT(0 <= x && x <= 1);
+  const T x3 = x * x * x;
+  return x3 * (10 + x * (6 * x - 15));  // 10x³ - 15x⁴ + 6x⁵
+}
+
+
 template class GeometricContactStateEstimator<double>;
 
-} // namespace tools
+} // namespace contact_state_estimator
 } // namespace kuka_iiwa_arm
 } // namespace examples
 } // namespace drake
