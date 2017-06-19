@@ -1,6 +1,7 @@
+
 /// @file
 ///
-/// Implements state tracker contact visualization from optitrack / real-robot LCM
+/// Implements state tracker from optitrack
 /// sources.
 
 #include <memory>
@@ -8,7 +9,6 @@
 #include <gflags/gflags.h>
 #include "bot_core/robot_state_t.hpp"
 #include "optitrack/optitrack_frame_t.hpp"
-#include "drake/lcmt_contact_results_for_viz.hpp"
 
 #include "drake/lcm/drake_lcm.h"
 #include "drake/common/drake_path.h"
@@ -16,21 +16,17 @@
 #include "drake/systems/framework/diagram_builder.h"
 #include "drake/systems/lcm/lcm_driven_loop.h"
 #include "drake/systems/lcm/lcm_publisher_system.h"
-#include "drake/examples/kuka_iiwa_arm/dev/contact_state_estimator/iiwa_and_object_state_aggregator.h"
 #include "drake/multibody/rigid_body_plant/drake_visualizer.h"
 #include "drake/multibody/rigid_body_tree_construction.h"
 #include "drake/multibody/rigid_body_tree.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_world/world_sim_tree_builder.h"
 #include "drake/examples/kuka_iiwa_arm/dev/contact_state_estimator/optitrack_pose_extractor.h"
 #include "drake/examples/kuka_iiwa_arm/iiwa_lcm.h"
-#include "drake/multibody/rigid_body_plant/contact_results_to_lcm.h"
 
-using bot_core::robot_state_t;
 using optitrack::optitrack_frame_t;
 using std::unique_ptr;
 
 DEFINE_string(urdf, "", "Name of urdf to load");
-DEFINE_bool(contacts, false, "turn on the contacts computation");
 
 namespace drake {
 namespace examples {
@@ -38,11 +34,7 @@ namespace kuka_iiwa_arm {
 namespace contact_state_estimator {
 namespace {
 
-const char *const kIiwaUrdf = "/manipulation/models/iiwa_description/urdf/"
-    "dual_iiwa14_partial_mesh_collision.urdf";
 const char *const kObjectUrdf = "/examples/kuka_iiwa_arm/models/objects/big_box.urdf";
-const int kNumRobotJoints = 14;
-const char *const kLcmIiwaStatusChannel = "IIWA_STATUS";
 const char *const kLcmOptitrackChannel = "OPTITRACK_FRAMES";
 
 std::unique_ptr<RigidBodyTreed> BuildDemoTree(
@@ -52,16 +44,12 @@ std::unique_ptr<RigidBodyTreed> BuildDemoTree(
 
   // Adds models to the simulation builder. Instances of these models can be
   // subsequently added to the world.
-  tree_builder->StoreModel("iiwa", kIiwaUrdf);
   tree_builder->StoreModel(
       "target", kObjectUrdf);
 
   tree_builder->AddGround();
-
-  tree_builder->AddFixedModelInstance("iiwa", Eigen::Vector3d::Zero());
   tree_builder->AddFloatingModelInstance("target", box_position,
-                                                  box_orientation);
-
+                                         box_orientation);
   return tree_builder->Build();
 }
 
@@ -72,78 +60,34 @@ int DoMain() {
 
   systems::DiagramBuilder<double> builder;
 
-    auto iiwa_status_sub = builder.AddSystem(
-      systems::lcm::LcmSubscriberSystem::Make<lcmt_iiwa_status>(
-          kLcmIiwaStatusChannel, &lcm));
-  iiwa_status_sub->set_name("status_sub");
-
-  auto iiwa_status_receiver = builder.AddSystem<IiwaStatusReceiver>(kNumRobotJoints);
-  iiwa_status_receiver->set_name("status_receiver");
-
   auto optitrack_sub =
       builder.AddSystem(
           systems::lcm::LcmSubscriberSystem::Make<optitrack_frame_t>(
               kLcmOptitrackChannel, &lcm));
   optitrack_sub->set_name("optitrack_sub");
 
-  // 0, 1 seem to be robot bases
-  auto optitrack_pose_extractor = builder.AddSystem<OptitrackPoseExtractor>(2);
+  auto optitrack_pose_extractor = builder.AddSystem<OptitrackPoseExtractor>();
   optitrack_pose_extractor->set_name("optitrack pose extractor");
 
   /// Create a custom method for the tree builder stuff.
   auto iiwa_object_tree = BuildDemoTree(
       Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 
-  auto iiwa_object_state_aggregator =
-      builder.AddSystem<IiwaAndObjectStateAggregator>(std::move(iiwa_object_tree));
-  iiwa_object_state_aggregator->set_name("iiwa object state aggregator");
-
   auto drake_visualizer = builder.AddSystem<systems::DrakeVisualizer>(
-      iiwa_object_state_aggregator->get_rigid_body_tree(),&lcm);
+      *iiwa_object_tree.get(),&lcm);
   drake_visualizer->set_name("drake visualizer");
 
-  drake::log()->info("Conecting iiwa sub to iiwa status receiver");
-  builder.Connect(iiwa_status_sub->get_output_port(0),
-                  iiwa_status_receiver->get_input_port(0));
-  drake::log()->info("Conecting iiwa status receiver to iiwa state aggregator");
-  builder.Connect(iiwa_status_receiver->get_measured_position_output_port(),
-                  iiwa_object_state_aggregator->get_input_port_iiwa_state());
   drake::log()->info("Conecting optitrack sub to pose extractor");
   builder.Connect(optitrack_sub->get_output_port(0),
                   optitrack_pose_extractor->get_input_port(0));
-  drake::log()->info("Conecting optitrack pose extractor to state aggregator");
-  builder.Connect(optitrack_pose_extractor->get_measured_pose_output_port(),
-                  iiwa_object_state_aggregator->get_input_port_object_state());
   drake::log()->info("Conecting state aggregator to visualizer");
-  drake::log()->info("stateaggregator dim {}",
-                     iiwa_object_state_aggregator->get_input_port_iiwa_state().size());
-  drake::log()->info("drake visualizer {}",
-                     drake_visualizer->get_input_port(0).size());
-  builder.Connect(iiwa_object_state_aggregator->get_output_port_visualizer_state(),
+  builder.Connect(optitrack_pose_extractor->get_measured_pose_output_port(),
                   drake_visualizer->get_input_port(0));
 
-  if(FLAGS_contacts) {
-    // contact state visualization.
-    // Add contact viz.
-    drake::log()->info("Contact visualization is on");
-    auto contact_viz =
-        builder.AddSystem<systems::ContactResultsToLcmSystem<double>>(
-            iiwa_object_state_aggregator->get_rigid_body_tree());
-    contact_viz->set_name("contact_viz");
-
-    auto contact_results_publisher = builder.AddSystem(
-        systems::lcm::LcmPublisherSystem::Make<lcmt_contact_results_for_viz>(
-            "CONTACT_RESULTS", &lcm));
-    contact_results_publisher->set_name("contact_results_publisher");
-
-    builder.Connect(iiwa_object_state_aggregator->get_output_port_contact_state(),
-                    contact_viz->get_input_port(0));
-    builder.Connect(contact_viz->get_output_port(0),
-                    contact_results_publisher->get_input_port(0));
-  }
   auto diagram = builder.Build();
 
   drake::log()->info("lcm driven loop started");
+
   systems::lcm::LcmDrivenLoop loop(
       *diagram, *optitrack_sub, nullptr, &lcm,
       std::make_unique<

@@ -12,14 +12,12 @@ template <typename T>
 GeometricContactStateEstimator<T>::GeometricContactStateEstimator(
     std::unique_ptr<RigidBodyTree<T>> tree) :
     tree_(std::move(tree)) {
-
 }
 
 template <typename T>
 void GeometricContactStateEstimator<T>::ComputeContactResults(
     const VectorX<T> &x, systems::ContactResults<T>* contact_results) {
 
-  ;
   const int nq = tree_->get_num_positions();
   const int nv = tree_->get_num_velocities();
   VectorX<T> q = x.topRows(nq);
@@ -134,7 +132,7 @@ void GeometricContactStateEstimator<T>::ComputeContactResults(
       // this term needs to be subtracted.
 
       contact_force += J.transpose() * fA;
-      if (contacts != nullptr) {
+      if (contact_results != nullptr) {
         systems::ContactInfo<T>& contact_info = contact_results->AddContact(
             pair.elementA->getId(), pair.elementB->getId());
 
@@ -162,6 +160,11 @@ void GeometricContactStateEstimator<T>::ComputeContactResults(
     }
   }
 //  return contact_results;
+}
+
+template <typename T>
+const RigidBodyTreed& GeometricContactStateEstimator<T>::get_rigid_body_tree() const {
+  return(*tree_.get());
 }
 
 template <typename T>

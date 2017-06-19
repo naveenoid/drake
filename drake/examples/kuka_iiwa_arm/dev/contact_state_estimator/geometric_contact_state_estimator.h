@@ -21,12 +21,12 @@ class GeometricContactStateEstimator {
   void ComputeContactResults(const VectorX<T>& x,
                              systems::ContactResults<T>* contact_results );
 
+  const RigidBodyTreed& get_rigid_body_tree() const;
  private:
   T ComputeFrictionCoefficient(T v_tangent_BAc);
   Matrix3<T> ComputeBasisFromZ(const Vector3<T>& z_axis_W);
   std::unique_ptr<RigidBodyTree<T>> tree_;
   T step5(T x);
-
 
   // Some parameters defining the contact.
   // TODO(amcastro-tri): Implement contact materials for the RBT engine.

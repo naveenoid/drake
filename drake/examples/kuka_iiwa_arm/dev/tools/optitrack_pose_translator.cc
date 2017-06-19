@@ -1,7 +1,9 @@
 #include "drake/examples/kuka_iiwa_arm/dev/tools/optitrack_pose_translator.h"
 
 #include "drake/common/drake_assert.h"
+#include "math.h"
 
+#include "drake/common/text_logging.h"
 #include "drake/examples/kuka_iiwa_arm/dev/tools/moving_average_filter.h"
 
 namespace drake {
@@ -17,7 +19,24 @@ Isometry3<double> DefaultWorldOptitrackTransform() {
   rot_mat.col(0) = -Eigen::Vector3d::UnitX();
   rot_mat.col(1) = Eigen::Vector3d::UnitZ();
   rot_mat.col(2) = Eigen::Vector3d::UnitY();
-  world_X_optitrack.linear() = rot_mat;
+
+  auto z_tranform = Eigen::AngleAxisd(-0.5 * M_PI, Eigen::Vector3d::UnitZ());
+
+  auto x_transform = Eigen::AngleAxisd(0.015 * M_PI, Eigen::Vector3d::UnitX());
+  world_X_optitrack.linear() = x_transform * z_tranform * rot_mat;
+
+
+//
+//  Eigen::Matrix3d rotate_again;
+//  rot_mat.col(0) = -Eigen::Vector3d::UnitY();
+//  rot_mat.col(1) = Eigen::Vector3d::UnitX();
+//  rot_mat.col(2) = Eigen::Vector3d::UnitZ();
+//
+ // world_X_optitrack.rotate(rot_mat2);
+  Eigen::Vector3d translator;
+  translator<< 0.565, -0.055 , 0;
+  world_X_optitrack.translate(translator);
+
   return(world_X_optitrack);
 }
 
@@ -42,6 +61,8 @@ Isometry3<double> OptitrackPoseTranslator::TranslatePose(
 
   std::vector<optitrack::optitrack_rigid_body_t> rigid_bodies =
       optitrack_msg->rigid_bodies;
+
+//  /drake::log()->info("optitack frame msg had {}", optitrack_msg->rigid_bodies.size());
 
   DRAKE_DEMAND(object_index_ < rigid_bodies.size());
   // The optitrack quaternion ordering is Z-W-X-Y.

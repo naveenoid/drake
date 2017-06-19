@@ -110,7 +110,7 @@ class IiwaStatusReceiver : public systems::LeafSystem<double> {
   }
 
   const systems::OutputPort<double>&
-    get_commanded_position_output_port() const {
+    get_pose_output_port() const {
     return this->get_output_port(commanded_position_output_port_);
   }
 

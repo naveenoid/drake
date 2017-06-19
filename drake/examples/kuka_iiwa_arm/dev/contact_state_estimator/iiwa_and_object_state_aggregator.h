@@ -4,10 +4,7 @@
 
 #include "drake/multibody/rigid_body_plant/contact_results.h"
 #include "drake/multibody/rigid_body_tree.h"
-
-// System with 2 abstract input ports
-// 1 abstract output port (ContactResults)
-// 1 vector output port (DrakeVisualizer)
+#include "drake/examples/kuka_iiwa_arm/dev/contact_state_estimator/geometric_contact_state_estimator.h"
 
 #include "drake/systems/framework/leaf_system.h"
 namespace drake {
@@ -17,7 +14,8 @@ namespace contact_state_estimator {
 
 class IiwaAndObjectStateAggregator : public systems::LeafSystem<double> {
  public:
-  IiwaAndObjectStateAggregator(std::unique_ptr<RigidBodyTreed> iiwa_object_tree);
+  IiwaAndObjectStateAggregator(std::unique_ptr<RigidBodyTreed> iiwa_object_tree,
+                               const double period_sec = 0.001);
 
   /**
   * Getter for the input port corresponding to the abstract input with iiwa
@@ -53,29 +51,24 @@ class IiwaAndObjectStateAggregator : public systems::LeafSystem<double> {
   const RigidBodyTreed& get_rigid_body_tree() const;
 
 
-  void SetDefaultState(const systems::Context<double>& context,
-                       systems::State<double>* state) const override;
-
-  void DoCalcUnrestrictedUpdate(const systems::Context<double>& context,
-                                systems::State<double>* state) const override;
+  void DoCalcDiscreteVariableUpdates(
+      const systems::Context<double>& context,
+      systems::DiscreteValues<double>* discrete_state) const override;
 
  private:
-
-  struct InternalState;
-
   void CalcVisualizerStateOutput(const systems::Context<double>& context,
                                  systems::BasicVector<double>* output) const;
-
   void CalcContactResultsOutput(const systems::Context<double>& context,
                                 systems::ContactResults<double>* contacts) const;
-
   int input_port_iiwa_state_{-1};
   int input_port_object_state_{-1};
   int output_port_visualizer_state_{-1};
   int output_port_contact_state_{-1};
 
-  std::unique_ptr<RigidBodyTreed> iiwa_object_tree_;
-  const int kNumPositions;
+//  RigidBodyTreed& iiwa_object_tree_;
+  const int kNumPositions{-1};
+  const int kNumVelocities{-1};
+  std::unique_ptr<GeometricContactStateEstimator<double>> geometric_contact_state_estimator_{nullptr};
 };
 
 } // contact_state_estimator
