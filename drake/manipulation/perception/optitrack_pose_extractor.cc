@@ -53,6 +53,7 @@ void OptitrackPoseExtractor::DoCalcDiscreteVariableUpdates(
 
   // The optitrack quaternion ordering is X-Y-Z-W and this needs fitting into
   // Eigens W-X-Y-Z ordering.
+
   Eigen::Quaterniond quaternion(
       rigid_bodies[object_id_].quat[3], rigid_bodies[object_id_].quat[0],
       rigid_bodies[object_id_].quat[1], rigid_bodies[object_id_].quat[2]);

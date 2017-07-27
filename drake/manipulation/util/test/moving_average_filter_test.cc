@@ -52,8 +52,7 @@ GTEST_TEST(MovingAverageVectorTest, UpdateVectorTest) {
   for (size_t i = 0; i < window.size(); ++i) {
     sum += window[i];
     EXPECT_TRUE(CompareMatrices(((1.0 / (i + 1)) * sum),
-                                (filter.Update(window[i])), 1e-12,in83
-
+                                (filter.Update(window[i])), 1e-12,
                                 drake::MatrixCompareType::absolute));
   }
 

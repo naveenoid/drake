@@ -37,7 +37,7 @@ class MovingAverageFilter {
    * @param window_size The size of the window.
    * @throws a std::runtime_error when window_size <= 0.
    */
-  explicit MovingAverageFilter(unsigned int window_size);
+  explicit MovingAverageFilter(int window_size);
 
   /**
    * Updates the average filter result. Every call to this method modifies
