@@ -39,4 +39,13 @@ drake_cc_googletest(
     ],
 )
 
+drake_cc_googletest(
+    name = "pose_smoother_test",
+    deps = [
+        ":pose_smoother",
+        "//drake/common:eigen_matrix_compare",
+        "//drake/systems/framework",
+    ],
+)
+
 cpplint()

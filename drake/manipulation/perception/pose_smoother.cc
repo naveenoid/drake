@@ -17,11 +17,6 @@ namespace perception {
 using Eigen::Quaterniond;
 
 namespace {
-VectorX<double> ComputeVelocities(
-    const Isometry3<double>& pose_1, const Isometry3<double>& pose_2) {
-
-}
-
 Isometry3<double> VectorToIsometry3(const VectorX<double>& pose_vector) {
   Isometry3<double> pose;
   pose.linear() = Quaterniond(pose_vector.segment<4>(3)).matrix();
@@ -42,9 +37,36 @@ Quaterniond Isometry3ToQuaternion(const Isometry3<double>& pose) {
 
 void FixQuaternionForCloseness(
     const Eigen::Quaterniond& q1, Eigen::Quaterniond *q2) {
-
+  double dot = q1.dot(*q2);
+  if(dot < 0.0) {
+    // Invert sign.
+    q2->w() = -q2->w();
+    q2->x() = -q2->x();
+    q2->y() = -q2->y();
+    q2->z() = -q2->z();
+  }
 }
 
+VectorX<double> ComputeVelocities(
+    const Isometry3<double>& pose_1, const Isometry3<double>& pose_2,
+    double delta_t) {
+  VectorX<double> velocities = VectorX<double>::Zero(6);
+
+  Eigen::Array3d translation_diff = pose_1.translation().array() -
+      pose_2.translation().array();
+  velocities.segment<3>(0) = (translation_diff / delta_t).matrix();
+
+  Eigen::AngleAxisd angle_axis_diff;
+  // Computes q[t+1] = q_delta * q[t] first, turn q_delta into an axis, which
+  // turns into an angular velocity.
+  angle_axis_diff =
+      Eigen::AngleAxisd(
+          Isometry3ToQuaternion(pose_1) *
+              Isometry3ToQuaternion(pose_2).inverse());
+  velocities.segment<3>(3) =
+      angle_axis_diff.axis() * angle_axis_diff.angle() / delta_t;
+  return(velocities);
+}
 } // namespace
 
 PoseSmoother::PoseSmoother(
@@ -65,20 +87,21 @@ PoseSmoother::PoseSmoother(
             BasicVector<double>(13),
             &PoseSmoother::OutputSmoothedState
         ).get_index()),
-    kMaxLinearVelocity(max_linear_velocity),
-    kMaxAngularVelocity(max_angular_velocity),
-    kLCMStatusPeriod(optitrack_lcm_status_period),
+    kMaxLinearVelocity(Eigen::Array3d::Constant(max_linear_velocity)),
+    kMaxAngularVelocity(Eigen::Array3d::Constant(max_angular_velocity)),
+    kDiscreteUpdateInSec(optitrack_lcm_status_period / 1000.),
     filter_(std::make_unique<MovingAverageFilter<VectorX<double>>>(
         filter_window_size)) {
   this->set_name("Pose Smoother");
-  this->DeclareVectorInputPort();
+  //this->DeclareVectorInputPort(BasicVector<double>::);
+  this->DeclareInputPort(systems::kVectorValued, 7);
   // Internal state dimensions are organised as :
   // 0-2 : Cartesian position.
   // 3-6 : Orientation in quaternions.
   // 7-9 : Linear velocity.
   // 10-12 : Angular velocity.
   this->DeclareDiscreteState(13);
-  this->DeclarePeriodicDiscreteUpdate(kLCMStatusPeriod);
+  this->DeclarePeriodicDiscreteUpdate(optitrack_lcm_status_period);
 }
 
 void PoseSmoother::DoCalcDiscreteVariableUpdates(
@@ -97,15 +120,46 @@ void PoseSmoother::DoCalcDiscreteVariableUpdates(
   Quaterniond current_quaternion = Isometry3ToQuaternion(current_pose);
 
   VectorX<double> current_velocity = ComputeVelocities(
-      input_pose, current_pose, kLCMStatusPeriod);
+      input_pose, current_pose, kDiscreteUpdateInSec);
 
-  // check if linear and angular velocities are below threshold
-  // fix quaternions if not near.
-  FixQuaternionForCloseness(current_pose, &input_pose);
-
-  state.head(7) = filter_->Update(input_pose);
+  // Check if linear and angular velocities are below threshold
+  if(current_velocity.segment<3>(0).array() < kMaxLinearVelocity &&
+     current_velocity.segment<3>(3).array() < kMaxAngularVelocity) {
+    // Fix quaternions if not near.
+    FixQuaternionForCloseness(current_pose, &input_pose);
+    VectorX<double> new_state = Isometry3ToVector(filter_->Update(input_pose));
+    state_vector.segment<6>(7) =  ComputeVelocities(
+        new_state, state_vector.head(7), kDiscreteUpdateInSec);
+    state_vector.head(7) = new_state;
+  }
 }
 
+void PoseSmoother::OutputSmoothedPose(
+    const systems::Context<double> &context,
+    systems::BasicVector<double> *output) const {
+  const auto state_value = context.get_discrete_state(0)->get_value();
+  Eigen::VectorBlock<VectorX<double>> measured_pose_output =
+      output->get_mutable_value();
+  measured_pose_output = state_value.head(7);
+}
+
+void PoseSmoother::OutputSmoothedVelocity(
+    const systems::Context<double> &context,
+    systems::BasicVector<double> *output) const {
+  const auto state_value = context.get_discrete_state(0)->get_value();
+  Eigen::VectorBlock<VectorX<double>> measured_pose_output =
+      output->get_mutable_value();
+  measured_pose_output = state_value.tail(6);
+}
+
+void PoseSmoother::OutputSmoothedState(
+    const systems::Context<double> &context,
+    systems::BasicVector<double> *output) const {
+  const auto state_value = context.get_discrete_state(0)->get_value();
+  Eigen::VectorBlock<VectorX<double>> measured_pose_output =
+      output->get_mutable_value();
+  measured_pose_output = state_value;
+}
 } // namespace perception
 } // namespace manipulation
 } // namespace drake

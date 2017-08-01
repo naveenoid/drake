@@ -22,7 +22,7 @@ namespace perception {
  *  While a "correct" quaternion averaging algorithm requires averaging the
  *  corresponding attitudes, this class implements a simplification based on
  *  the version described in http://wiki.unity3d.com/index.php/Averaging_Quaternions_and_Vectors
- *  and in
+ *  and in the introduction in [Landis et al].
  *
  *
  */
@@ -61,9 +61,9 @@ class PoseSmoother : public systems::LeafSystem<double> {
   const int smoothed_pose_output_port_{0};
   const int smoothed_velocity_output_port_{0};
   const int smoothed_state_output_port_{0};
-  const double kMaxLinearVelocity{0.0};
-  const double kMaxAngularVelocity{0.0};
-  const double kLCMStatusPeriod{0};
+  const Eigen::Array3d kMaxLinearVelocity;
+  const Eigen::Array3d kMaxAngularVelocity;
+  const double kDiscreteUpdateInSec{0};
   const std::unique_ptr<util::MovingAverageFilter<VectorX<double>>> filter_;
 };
 
