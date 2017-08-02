@@ -61,13 +61,13 @@ VectorX<double> ComputeVelocities(
   // turns into an angular velocity.
   angle_axis_diff =
       Eigen::AngleAxisd(
-          Isometry3ToQuaternion(pose_1) *
-              Isometry3ToQuaternion(pose_2).inverse());
+          pose_1.linear() *
+              pose_2.linear().inverse());
   velocities.segment<3>(3) =
       angle_axis_diff.axis() * angle_axis_diff.angle() / delta_t;
   return(velocities);
 }
-} // namespace
+} // namespacears
 
 PoseSmoother::PoseSmoother(
     double max_linear_velocity, double max_angular_velocity,
@@ -87,9 +87,9 @@ PoseSmoother::PoseSmoother(
             BasicVector<double>(13),
             &PoseSmoother::OutputSmoothedState
         ).get_index()),
-    kMaxLinearVelocity(Eigen::Array3d::Constant(max_linear_velocity)),
-    kMaxAngularVelocity(Eigen::Array3d::Constant(max_angular_velocity)),
-    kDiscreteUpdateInSec(optitrack_lcm_status_period / 1000.),
+    kMaxLinearVelocity(max_linear_velocity),
+    kMaxAngularVelocity(max_angular_velocity),
+    kDiscreteUpdateInSec(optitrack_lcm_status_period),
     filter_(std::make_unique<MovingAverageFilter<VectorX<double>>>(
         filter_window_size)) {
   this->set_name("Pose Smoother");
@@ -100,7 +100,8 @@ PoseSmoother::PoseSmoother(
   // 3-6 : Orientation in quaternions.
   // 7-9 : Linear velocity.
   // 10-12 : Angular velocity.
-  this->DeclareDiscreteState(13);
+  // 13 : Time since last accepted sample.
+  this->DeclareDiscreteState(14);
   this->DeclarePeriodicDiscreteUpdate(optitrack_lcm_status_period);
 }
 
@@ -120,17 +121,34 @@ void PoseSmoother::DoCalcDiscreteVariableUpdates(
   Quaterniond current_quaternion = Isometry3ToQuaternion(current_pose);
 
   VectorX<double> current_velocity = ComputeVelocities(
-      input_pose, current_pose, kDiscreteUpdateInSec);
+      input_pose, current_pose, state_vector(13));
 
   // Check if linear and angular velocities are below threshold
-  if(current_velocity.segment<3>(0).array() < kMaxLinearVelocity &&
-     current_velocity.segment<3>(3).array() < kMaxAngularVelocity) {
-    // Fix quaternions if not near.
-    FixQuaternionForCloseness(current_pose, &input_pose);
-    VectorX<double> new_state = Isometry3ToVector(filter_->Update(input_pose));
-    state_vector.segment<6>(7) =  ComputeVelocities(
-        new_state, state_vector.head(7), kDiscreteUpdateInSec);
-    state_vector.head(7) = new_state;
+  bool accept_data_point = true;
+   for(int i = 0; i < 3; ++i) {
+    if (current_velocity(i) >= kMaxLinearVelocity ||
+        current_velocity(3+i) >= kMaxAngularVelocity) {
+      accept_data_point = false;
+      break;
+    }
+  }
+
+  // If data is below threshold it can be added to the filter.
+  if(accept_data_point) {
+      FixQuaternionForCloseness(current_quaternion, &input_quaternion);
+      input_pose.linear() = input_quaternion.toRotationMatrix();
+      VectorX<double>
+          new_state = filter_->Update(Isometry3ToVector(
+          input_pose));
+      state_vector.segment<6>(7) = ComputeVelocities(
+          VectorToIsometry3(new_state), VectorToIsometry3(state_vector.head(7)),
+          state_vector(13));
+      state_vector.head(7) = new_state;
+      state_vector(13) = kDiscreteUpdateInSec;
+  } else {
+    // Since the current sample has been rejected, the time since the last
+    // sample must be incremented suitably.
+    state_vector(13) += kDiscreteUpdateInSec;
   }
 }
 

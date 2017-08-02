@@ -23,13 +23,21 @@ namespace perception {
  *  corresponding attitudes, this class implements a simplification based on
  *  the version described in http://wiki.unity3d.com/index.php/Averaging_Quaternions_and_Vectors
  *  and in the introduction in [Landis et al].
- *
+ *  References:
+ *  Landis and Markley
  *
  */
 class PoseSmoother : public systems::LeafSystem<double> {
   public:
   DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(PoseSmoother)
-
+  /**
+   * Constructs the pose smoother.
+   * @param max_linear_velocity Upper threshold on linear velocity (m/sec).
+   * @param max_angular_velocity Upper threshold on angular velocity (rads/sec).
+   * @param filter_window_size Window size for the moving average smoothing.
+   * @param optitrack_lcm_status_period The period for the internal update
+   * (sec). This must be set to a value greater than 0.
+   */
   PoseSmoother(
       double max_linear_velocity, double max_angular_velocity,
       int filter_window_size, double optitrack_lcm_status_period);
@@ -61,8 +69,8 @@ class PoseSmoother : public systems::LeafSystem<double> {
   const int smoothed_pose_output_port_{0};
   const int smoothed_velocity_output_port_{0};
   const int smoothed_state_output_port_{0};
-  const Eigen::Array3d kMaxLinearVelocity;
-  const Eigen::Array3d kMaxAngularVelocity;
+  const double kMaxLinearVelocity{0.0};
+  const double kMaxAngularVelocity{0.0};
   const double kDiscreteUpdateInSec{0};
   const std::unique_ptr<util::MovingAverageFilter<VectorX<double>>> filter_;
 };

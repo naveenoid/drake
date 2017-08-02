@@ -23,7 +23,7 @@ class PoseSmootherTest : public ::testing::Test {
     output_ = dut_->AllocateOutput(*context_);
 
     EXPECT_EQ(dut_->get_num_input_ports(), 1);
-    EXPECT_EQ(dut_->get_num_output_ports(), 1);
+    EXPECT_EQ(dut_->get_num_output_ports(), 3);
   }
  private:
   std::unique_ptr<PoseSmoother> dut_;
