@@ -50,6 +50,9 @@ class PoseSmoother : public systems::LeafSystem<double> {
     return this->get_output_port(smoothed_velocity_output_port_);
   }
 
+  const systems::OutputPort<double>& get_smoothed_state_output_port() const {
+    return this->get_output_port(smoothed_state_output_port_);
+  }
  protected:
   void DoCalcDiscreteVariableUpdates(
       const systems::Context<double>& context,

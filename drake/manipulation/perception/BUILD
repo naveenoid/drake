@@ -8,6 +8,10 @@ load(
     "drake_cc_googletest",
 )
 
+package(
+    default_visibility = ["//visibility:public"],
+)
+
 drake_cc_library(
     name = "optitrack_pose_extractor",
     srcs = ["optitrack_pose_extractor.cc"],
