@@ -209,6 +209,7 @@ int DoMain() {
   //                          plan_source_context->get_mutable_state());
 
   loop.RunToSecondsAssumingInitialized();
+  drake::log()->info("lcm driven loop about to be stopped for some reason");
   return 0;
 }
 
