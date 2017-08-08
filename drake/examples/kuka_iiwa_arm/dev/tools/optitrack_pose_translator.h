@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 #include "optitrack/optitrack_frame_t.hpp"
 
 #include "drake/common/eigen_types.h"
