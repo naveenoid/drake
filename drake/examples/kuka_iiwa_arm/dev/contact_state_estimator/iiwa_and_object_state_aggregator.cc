@@ -52,7 +52,7 @@ IiwaAndObjectStateAggregator::IiwaAndObjectStateAggregator(
                              kNumPositions + kNumVelocities - 13).get_index();
   input_port_object_state_ =
       this->DeclareInputPort(systems::kVectorValued, 13).get_index();
-  this->DeclareDiscreteState(kNumPositions + 7);
+  this->DeclareDiscreteState(kNumPositions + kNumVelocities);
   this->DeclarePeriodicDiscreteUpdate(period_sec);
   drake::log()->info("IIwa object state aggregator");
 }
@@ -76,7 +76,6 @@ void IiwaAndObjectStateAggregator::DoCalcDiscreteVariableUpdates(
 //  drake::log()->info("object_state_vector {}", object_state_vector(5));
 //  drake::log()->info("object_state_vector {}", object_state_vector(6));
 
-  // this->EvalAbstractInput(context, 0);
   DRAKE_ASSERT(iiwa_state != nullptr);
   DRAKE_ASSERT(object_state != nullptr);
 
@@ -85,21 +84,19 @@ void IiwaAndObjectStateAggregator::DoCalcDiscreteVariableUpdates(
 
   state_value = VectorX<double>::Zero(kNumPositions + kNumVelocities);
   VectorX<double> iiwa_state_vector = iiwa_state->CopyToVector();
-  state_value.segment<14>(0) = iiwa_state_vector.head(14);
-  state_value.segment<7>(14) = object_state_vector;
-
-  drake::log()->info("Aggregator object state x {}, {}, {}",
-                     object_state_vector(0), object_state_vector(1),
-                     object_state_vector(2));
-
-
+  state_value.segment<kNumPositions - 7>(0) = iiwa_state_vector.head(kNumPositions - 7);
+  state_value.segment<7>(kNumPositions - 7) = object_state_vector;
+//
+//  drake::log()->info("Aggregator object position {}, {}, {}",
+//                     object_state_vector(0), object_state_vector(1),
+//                     object_state_vector(2));
 }
 
 void IiwaAndObjectStateAggregator::CalcVisualizerStateOutput(
     const Context<double>& context, BasicVector<double>* output) const {
   const VectorX<double> state_vector =
       context.get_discrete_state(0)->CopyToVector();
-  output->get_mutable_value().head(21) = state_vector;
+  output->get_mutable_value().head(kNumPositions + kNumVelocities) = state_vector;
 }
 
 void IiwaAndObjectStateAggregator::CalcContactResultsOutput(

@@ -88,37 +88,37 @@ int DoMain() {
   // from experimentation
   Eigen::Isometry3d X_WO = Eigen::Isometry3d::Identity();
   Eigen::Matrix3d rot_mat;
-  rot_mat.col(1) = -Eigen::Vector3d::UnitX();
-  rot_mat.col(2) = Eigen::Vector3d::UnitZ();
-  rot_mat.col(3) = Eigen::Vector3d::UnitY();
+  rot_mat.col(0) = -Eigen::Vector3d::UnitX();
+  rot_mat.col(1) = Eigen::Vector3d::UnitZ();
+  rot_mat.col(2) = Eigen::Vector3d::UnitY();
 
-    auto z_transform = Eigen::AngleAxisd(-0.5*M_PI, Eigen::Vector3d::UnitZ());
-    auto x_transform = Eigen::AngleAxisd(0.03*M_PI, Eigen::Vector3d::UnitX());
+  // The following params have been carefully hand tuned to fit the canned_multi_arm_demo_1
+  // dataset. The reason for a deviation of these params from the expected
+  // X_WO is that the position and pose of the object (box) frame is not exactly
+  // in the middle / and has a small rotation about the optitrack z axis when the
+  // object is laid flat on the demo table. Future work to better fit the box frame
+  // on the optitrack UI should fix this problem.
+  auto z_transform = Eigen::AngleAxisd(-0.023*M_PI, Eigen::Vector3d::UnitZ());
 
-//  auto z_transform = Eigen::AngleAxisd(0.5*M_PI, Eigen::Vector3d::UnitZ());
-//  auto x_transform = Eigen::AngleAxisd(0.5*M_PI, Eigen::Vector3d::UnitX());
-
-  X_WO.linear() = x_transform * z_transform * rot_mat;
+  X_WO.linear() = z_transform * rot_mat;
   Eigen::Vector3d translator;
   translator = Eigen::Vector3d::Zero();
-  translator<< 0.0, 0.0, 0.0;
-  //translator<< 0.565, -0.055, 0;
-  //translator<< 0.765, -0.55, 0;
+  translator<< -0.343, -0.0825, 0.06;
   X_WO.translate(translator);
 
   drake::log()->info("About to add pose extractor");
   // 0, 1 seem to be robot bases
   // Update to thje new version of the pose extractor
   auto optitrack_pose_extractor = builder.AddSystem<OptitrackPoseExtractor>(2,
-  X_WO, 0.01 /* pose extractor period */);
+  X_WO, 0.005 /* pose extractor period */);
   optitrack_pose_extractor->set_name("optitrack pose extractor");
 
-//  auto pose_smoother = builder.AddSystem<PoseSmoother>(
-//      1.0 /* max_linear_velocity */, M_PI /* max_radial_velocity */,
-//      5 /* window_size */, 0.01 /* lcm status period */);
+  auto pose_smoother = builder.AddSystem<PoseSmoother>(
+      1.0 /* max_linear_velocity */, M_PI/3 /* max_radial_velocity */,
+      3 /* window_size */, 0.005 /* lcm status period */);
 
-    auto pose_smoother = builder.AddSystem<PoseSmoother>(
-            0.01 /*lcm status period */);
+//    auto pose_smoother = builder.AddSystem<PoseSmoother>(
+//            0.01 /*lcm status period */);
 
   /// Create a custom method for the tree builder stuff.
   auto iiwa_object_tree =
@@ -132,7 +132,7 @@ int DoMain() {
   drake::log()->info("About to add StateAggregator");
   auto iiwa_object_state_aggregator =
       builder.AddSystem<IiwaAndObjectStateAggregator>(
-          std::move(iiwa_object_tree), 0.01 /* period_sec */);
+          std::move(iiwa_object_tree), 0.005 /* period_sec */);
   iiwa_object_state_aggregator->set_name("iiwa object state aggregator");
 
   drake::log()->info("About to add visuaLizer");

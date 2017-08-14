@@ -168,7 +168,7 @@ void PoseSmoother::DoCalcDiscreteVariableUpdates(
   Isometry3<double> input_pose = VectorToIsometry3(input_pose_vector);
 
   if(kSmoothingMode) {
-      drake::log()->info("about to smooth");
+//      drake::log()->info("about to smooth");
     Isometry3<double> current_pose = VectorToIsometry3(state_vector.head(7));
 
     Quaterniond input_quaternion = Isometry3ToQuaternion(input_pose);
@@ -211,6 +211,14 @@ void PoseSmoother::DoCalcDiscreteVariableUpdates(
       // sample must be incremented suitably.
       state_vector(13) += kDiscreteUpdateInSec;
     }
+//
+//    drake::log()->info("Smoother object position {}, {}, {}",
+//                       state_vector(0), state_vector(1),
+//                       state_vector(2));
+//    drake::log()->info("Smoother object quaternion {}, {}, {}, {}",
+//                       state_vector(3), state_vector(4),
+//                       state_vector(5), state_vector(6));
+
 
     state_basic_vector->get_mutable_value() = state_vector;
   } else {
@@ -218,7 +226,7 @@ void PoseSmoother::DoCalcDiscreteVariableUpdates(
     padded_state.head(7) = input_pose_vector;
     state_basic_vector->get_mutable_value() = padded_state;
 
-    drake::log()->info("Unsmoother object state x {}, {}, {}",
+    drake::log()->info("Unsmoother object position {}, {}, {}",
                        input_pose_vector(0), input_pose_vector(1),
                        input_pose_vector(2));
   }
