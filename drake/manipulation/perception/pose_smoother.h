@@ -41,6 +41,12 @@ class PoseSmoother : public systems::LeafSystem<double> {
   PoseSmoother(
       double max_linear_velocity, double max_angular_velocity,
       int filter_window_size, double optitrack_lcm_status_period);
+ /**
+ * Default mode - does no smoothing and only padding of the velocities to 0s.
+ * @param optitrack_lcm_status_period The period for the internal update
+   * (sec). This must be set to a value greater than 0.
+ */
+  PoseSmoother(double optitrack_lcm_status_period);
 
   const systems::OutputPort<double>& get_smoothed_pose_output_port() const {
     return this->get_output_port(smoothed_pose_output_port_);
@@ -76,6 +82,7 @@ class PoseSmoother : public systems::LeafSystem<double> {
   const double kMaxAngularVelocity{0.0};
   const double kDiscreteUpdateInSec{0};
   const std::unique_ptr<util::MovingAverageFilter<VectorX<double>>> filter_;
+  const bool kSmoothingMode{false};
 };
 
 } // namespace perception

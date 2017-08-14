@@ -6,6 +6,7 @@
 #include "drake/math/quaternion.h"
 #include "drake/math/rotation_matrix.h"
 #include "drake/systems/framework/context.h"
+#include "drake/common/text_logging.h"
 
 namespace drake {
 using systems::Context;
@@ -32,6 +33,7 @@ OptitrackPoseExtractor::OptitrackPoseExtractor(
   // parameterization.
   this->DeclareDiscreteState(7);
   this->DeclarePeriodicDiscreteUpdate(optitrack_lcm_status_period);
+  drake::log()->info("Just created OptitrackPoseExtractor");
 }
 
 void OptitrackPoseExtractor::DoCalcDiscreteVariableUpdates(
@@ -47,9 +49,13 @@ void OptitrackPoseExtractor::DoCalcDiscreteVariableUpdates(
 
   std::vector<optitrack::optitrack_rigid_body_t> rigid_bodies =
       pose_message.rigid_bodies;
-
   DRAKE_THROW_UNLESS(object_id_ < static_cast<int>(rigid_bodies.size()));
-  DRAKE_THROW_UNLESS(rigid_bodies[object_id_].id == object_id_);
+
+//  drake::log()->info("Object ID inside the LCM struct 0 {}", rigid_bodies[0].id);
+//  drake::log()->info("Object ID inside the LCM struct 1 {}", rigid_bodies[1].id);
+//  drake::log()->info("Object ID inside the LCM struct 2 {}", rigid_bodies[2].id);
+//  drake::log()->info("Object ID I ask for {}", object_id_);
+//  DRAKE_THROW_UNLESS(rigid_bodies[object_id_].id == object_id_);
 
   // The optitrack quaternion ordering is X-Y-Z-W and this needs fitting into
   // Eigens W-X-Y-Z ordering.
@@ -64,8 +70,18 @@ void OptitrackPoseExtractor::DoCalcDiscreteVariableUpdates(
   X_OB.translation() = Eigen::Vector3d(rigid_bodies[object_id_].xyz[0],
                                          rigid_bodies[object_id_].xyz[1],
                                          rigid_bodies[object_id_].xyz[2]);
+
+  drake::log()->info("Raw object position x {}, {}, {}",
+                     rigid_bodies[object_id_].xyz[0],
+                     rigid_bodies[object_id_].xyz[1],
+                     rigid_bodies[object_id_].xyz[2]);
+
   X_OB.makeAffine();
   Isometry3<double> X_WB = X_WO_ * X_OB;
+
+  VectorX<double> trans = X_WB.translation();
+  drake::log()->info("transformed object position x {}, {}, {}",
+                     trans(0), trans(1), trans(2));
 
   state_value.segment<3>(0) = X_WB.translation();
   state_value.segment<4>(3) = Eigen::Quaterniond(X_WB.linear()).coeffs();

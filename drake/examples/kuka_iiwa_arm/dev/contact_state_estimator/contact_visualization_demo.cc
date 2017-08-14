@@ -93,33 +93,49 @@ int DoMain() {
   rot_mat.col(2) = Eigen::Vector3d::UnitZ();
   rot_mat.col(3) = Eigen::Vector3d::UnitY();
 
-  auto z_transform = Eigen::AngleAxisd(-0.5*M_PI, Eigen::Vector3d::UnitZ());
-  auto x_transform = Eigen::AngleAxisd(0.015*M_PI, Eigen::Vector3d::UnitX());
+    auto z_transform = Eigen::AngleAxisd(0.5*M_PI, Eigen::Vector3d::UnitZ());
+    auto x_transform = Eigen::AngleAxisd(0.015*M_PI, Eigen::Vector3d::UnitX());
+
+//  auto z_transform = Eigen::AngleAxisd(0.5*M_PI, Eigen::Vector3d::UnitZ());
+//  auto x_transform = Eigen::AngleAxisd(0.5*M_PI, Eigen::Vector3d::UnitX());
 
   X_WO.linear() = x_transform * z_transform * rot_mat;
   Eigen::Vector3d translator;
+  translator = Eigen::Vector3d::Zero();
+  //translator<< 0.0, 0.0, 0;
   translator<< 0.565, -0.055, 0;
   X_WO.translate(translator);
 
+  drake::log()->info("About to add pose extractor");
   // 0, 1 seem to be robot bases
   // Update to thje new version of the pose extractor
   auto optitrack_pose_extractor = builder.AddSystem<OptitrackPoseExtractor>(2,
   X_WO, 0.01 /* pose extractor period */);
   optitrack_pose_extractor->set_name("optitrack pose extractor");
 
-  auto pose_smoother = builder.AddSystem<PoseSmoother>(
-      1.0 /* max_linear_velocity */, M_PI /* max_radial_velocity */,
-      5 /* window_size */, 0.01 /* lcm status period */);
+//  auto pose_smoother = builder.AddSystem<PoseSmoother>(
+//      1.0 /* max_linear_velocity */, M_PI /* max_radial_velocity */,
+//      5 /* window_size */, 0.01 /* lcm status period */);
+
+    auto pose_smoother = builder.AddSystem<PoseSmoother>(
+            0.01 /*lcm status period */);
 
   /// Create a custom method for the tree builder stuff.
   auto iiwa_object_tree =
       BuildDemoTree(Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 
+  drake::log()->info("Demo tree contains numposition {}",
+                     iiwa_object_tree->get_num_positions());
+  drake::log()->info("Demo tree contains numvelocity {}",
+                     iiwa_object_tree->get_num_velocities());
+
+  drake::log()->info("About to add StateAggregator");
   auto iiwa_object_state_aggregator =
       builder.AddSystem<IiwaAndObjectStateAggregator>(
-          std::move(iiwa_object_tree));
+          std::move(iiwa_object_tree), 0.01 /* period_sec */);
   iiwa_object_state_aggregator->set_name("iiwa object state aggregator");
 
+  drake::log()->info("About to add visuaLizer");
   auto drake_visualizer = builder.AddSystem<systems::DrakeVisualizer>(
       iiwa_object_state_aggregator->get_rigid_body_tree(), &lcm);
   drake_visualizer->set_name("drake visualizer");
@@ -140,13 +156,15 @@ int DoMain() {
                   iiwa_object_state_aggregator->get_input_port_object_state());
   // insert a pose smoother here.
 
-  drake::log()->info("Conecting optitrack pose extractor to smoother to state aggregator");
-//  builder.Connect(optitrack_pose_extractor->get_measured_pose_output_port(),
-//                  iiwa_object_state_aggregator->get_input_port_object_state());
-  drake::log()->info("Conecting state aggregator to visualizer");
+  drake::log()->info("pose_smoother->get_smoothed_state_output_port() {}",
+                     pose_smoother->get_smoothed_state_output_port().size());
+
   drake::log()->info(
       "stateaggregator dim {}",
-      iiwa_object_state_aggregator->get_input_port_iiwa_state().size());
+      iiwa_object_state_aggregator->get_input_port_object_state().size());
+
+  drake::log()->info("Conecting state aggregator to visualizer");
+
   drake::log()->info("drake visualizer {}",
                      drake_visualizer->get_input_port(0).size());
   builder.Connect(

@@ -17,6 +17,7 @@ drake_cc_library(
     srcs = ["optitrack_pose_extractor.cc"],
     hdrs = ["optitrack_pose_extractor.h"],
     deps = [
+        "//drake/common:text_logging_gflags",
         "//drake/math:geometric_transform",
         "//drake/systems/framework",
         "@optitrack_driver//lcmtypes:optitrack_lcmtypes",
@@ -28,6 +29,7 @@ drake_cc_library(
     srcs = ["pose_smoother.cc"],
     hdrs = ["pose_smoother.h"],
     deps = [
+        "//drake/common:text_logging_gflags",
         "//drake/manipulation/util:moving_average_filter",
         "//drake/math:geometric_transform",
         "//drake/systems/framework",

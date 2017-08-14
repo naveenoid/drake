@@ -45,7 +45,6 @@ drake_cc_binary(
         "//drake/manipulation/models/iiwa_description:models",
     ],
     deps = [
-        #        ":geometric_contact_state_estimator",
         ":iiwa_and_object_state_aggregator",
         "//drake/examples/kuka_iiwa_arm:iiwa_lcm",
         "//drake/examples/kuka_iiwa_arm/iiwa_world:world_sim_tree_builder",
@@ -58,42 +57,34 @@ drake_cc_binary(
         "//drake/multibody:rigid_body_tree",
         "//drake/multibody/rigid_body_plant:contact_results_to_lcm",
         "//drake/systems/lcm:lcm_driven_loop",
-        #    "@bot_core_lcmtypes",
         "@com_github_gflags_gflags//:gflags",
         "@optitrack_driver//lcmtypes:optitrack_lcmtypes",
     ],
 )
-#
-#drake_cc_binary(
-#    name = "robot_visualization_demo",
-#    srcs = ["robot_visualization_demo.cc"],
-#    data = ["//drake/examples/kuka_iiwa_arm:models"],
-#    deps = [
-#        "//drake/examples/kuka_iiwa_arm:iiwa_lcm",
-#        "//drake/examples/kuka_iiwa_arm/iiwa_world:world_sim_tree_builder",
-#        "//drake/lcm",
-#        "//drake/lcmtypes:iiwa",
-#        "//drake/systems/lcm:lcm_driven_loop",
-#        "@bot_core_lcmtypes",
-#        "@com_github_gflags_gflags//:gflags",
-#    ],
-#)
-#
-#drake_cc_binary(
-#    name = "box_pose_visualization_demo",
-#    srcs = ["box_pose_visualization_demo.cc"],
-#    data = ["//drake/manipulation/models/iiwa_description:models"],
-#    deps = [
-#        ":optitrack_pose_extractor",
-#        "//drake/examples/kuka_iiwa_arm:iiwa_lcm",
-#        "//drake/examples/kuka_iiwa_arm/iiwa_world:world_sim_tree_builder",
-#        "//drake/lcm",
-#        "//drake/lcmtypes:iiwa",
-#        "//drake/systems/lcm:lcm_driven_loop",
-#        "@bot_core_lcmtypes",
-#        "@com_github_gflags_gflags//:gflags",
-#        "@optitrack_driver//lcmtypes:optitrack_lcmtypes",
-#    ],
-#)
+
+drake_cc_binary(
+    name = "optitrack_pose_identification_demo",
+    srcs = ["optitrack_pose_identification_demo.cc"],
+    data = [
+        "//drake/examples/kuka_iiwa_arm:models",
+        "//drake/manipulation/models/iiwa_description:models",
+    ],
+    deps = [
+        ":iiwa_and_object_state_aggregator",
+        "//drake/examples/kuka_iiwa_arm:iiwa_lcm",
+        "//drake/examples/kuka_iiwa_arm/iiwa_world:world_sim_tree_builder",
+        "//drake/lcm",
+        "//drake/lcmtypes:contact_info_for_viz",
+        "//drake/lcmtypes:contact_results_for_viz",
+        "//drake/lcmtypes:iiwa",
+        "//drake/manipulation/perception:optitrack_pose_extractor",
+        "//drake/manipulation/perception:pose_smoother",
+        "//drake/multibody:rigid_body_tree",
+        "//drake/multibody/rigid_body_plant:contact_results_to_lcm",
+        "//drake/systems/lcm:lcm_driven_loop",
+        "@com_github_gflags_gflags//:gflags",
+        "@optitrack_driver//lcmtypes:optitrack_lcmtypes",
+    ],
+)
 
 cpplint()

@@ -6,6 +6,9 @@
 #include "drake/systems/framework/context.h"
 #include "drake/manipulation/util/moving_average_filter.h"
 #include "drake/common/eigen_types.h"
+#include "drake/common/text_logging.h"
+
+#define PRINT_VAR(x) drake::log()->info(#x": {}", x);
 
 namespace drake {
 using systems::Context;
@@ -69,6 +72,25 @@ VectorX<double> ComputeVelocities(
 }
 } // namespacears
 
+///////////////////////// debug code
+void QuaternionLogger(std::string name, Eigen::Quaterniond q) {
+  drake::log()->info(name);
+  PRINT_VAR(q.w());
+  PRINT_VAR(q.x());
+  PRINT_VAR(q.y());
+  PRINT_VAR(q.z());
+}
+
+void VelocityLogger(std::string name, VectorX<double> v) {
+  drake::log()->info(name);
+  PRINT_VAR(v(0));
+  PRINT_VAR(v(2));
+  PRINT_VAR(v(3));
+  PRINT_VAR(v(4));
+  PRINT_VAR(v(5));
+  PRINT_VAR(v(6));
+}
+///////////////////////// debug code
 PoseSmoother::PoseSmoother(
     double max_linear_velocity, double max_angular_velocity,
     int filter_window_size, double optitrack_lcm_status_period) :
@@ -91,9 +113,8 @@ PoseSmoother::PoseSmoother(
     kMaxAngularVelocity(max_angular_velocity),
     kDiscreteUpdateInSec(optitrack_lcm_status_period),
     filter_(std::make_unique<MovingAverageFilter<VectorX<double>>>(
-        filter_window_size)) {
+        filter_window_size)), kSmoothingMode(true) {
   this->set_name("Pose Smoother");
-  //this->DeclareVectorInputPort(BasicVector<double>::);
   this->DeclareInputPort(systems::kVectorValued, 7);
   // Internal state dimensions are organised as :
   // 0-2 : Cartesian position.
@@ -102,6 +123,36 @@ PoseSmoother::PoseSmoother(
   // 10-12 : Angular velocity.
   // 13 : Time since last accepted sample.
   this->DeclareDiscreteState(14);
+  this->DeclarePeriodicDiscreteUpdate(optitrack_lcm_status_period);
+}
+
+PoseSmoother::PoseSmoother(double optitrack_lcm_status_period) :
+        smoothed_pose_output_port_(
+                this->DeclareVectorOutputPort(
+                        BasicVector<double>(7),
+                        &PoseSmoother::OutputSmoothedPose
+                ).get_index()),
+        smoothed_velocity_output_port_(
+                this->DeclareVectorOutputPort(
+                        BasicVector<double>(6),
+                        &PoseSmoother::OutputSmoothedVelocity
+                ).get_index()),
+        smoothed_state_output_port_(
+                this->DeclareVectorOutputPort(
+                        BasicVector<double>(13),
+                        &PoseSmoother::OutputSmoothedState
+                ).get_index()),
+        kDiscreteUpdateInSec(optitrack_lcm_status_period),
+    kSmoothingMode(false) {
+  this->set_name("Pose Smoother");
+  this->DeclareInputPort(systems::kVectorValued, 7);
+  // Internal state dimensions are organised as :
+  // 0-2 : Cartesian position.
+  // 3-6 : Orientation in quaternions.
+  // 7-9 : Linear velocity.
+  // 10-12 : Angular velocity.
+  // 13 : Time since last accepted sample.
+  this->DeclareDiscreteState(13);
   this->DeclarePeriodicDiscreteUpdate(optitrack_lcm_status_period);
 }
 
@@ -115,26 +166,35 @@ void PoseSmoother::DoCalcDiscreteVariableUpdates(
   VectorX<double> state_vector = state_basic_vector->get_mutable_value();
 
   Isometry3<double> input_pose = VectorToIsometry3(input_pose_vector);
-  Isometry3<double> current_pose = VectorToIsometry3(state_vector.head(7));
 
-  Quaterniond input_quaternion =  Isometry3ToQuaternion(input_pose);
-  Quaterniond current_quaternion = Isometry3ToQuaternion(current_pose);
+  if(kSmoothingMode) {
+      drake::log()->info("about to smooth");
+    Isometry3<double> current_pose = VectorToIsometry3(state_vector.head(7));
 
-  VectorX<double> current_velocity = ComputeVelocities(
-      input_pose, current_pose, state_vector(13));
+    Quaterniond input_quaternion = Isometry3ToQuaternion(input_pose);
+    Quaterniond current_quaternion = Isometry3ToQuaternion(current_pose);
 
-  // Check if linear and angular velocities are below threshold
-  bool accept_data_point = true;
-   for(int i = 0; i < 3; ++i) {
-    if (current_velocity(i) >= kMaxLinearVelocity ||
-        current_velocity(3+i) >= kMaxAngularVelocity) {
-      accept_data_point = false;
-      break;
+    // If t = 0
+    if (state_vector(13) == 0) {
+      state_vector(13) = kDiscreteUpdateInSec;
+      current_pose = input_pose;
     }
-  }
 
-  // If data is below threshold it can be added to the filter.
-  if(accept_data_point) {
+    VectorX<double> current_velocity = ComputeVelocities(
+        input_pose, current_pose, state_vector(13));
+
+    // Check if linear and angular velocities are below threshold
+    bool accept_data_point = true;
+    for (int i = 0; i < 3; ++i) {
+      if (current_velocity(i) >= kMaxLinearVelocity ||
+          current_velocity(3 + i) >= kMaxAngularVelocity) {
+        accept_data_point = false;
+        break;
+      }
+    }
+
+    // If data is below threshold it can be added to the filter.
+    if (accept_data_point) {
       FixQuaternionForCloseness(current_quaternion, &input_quaternion);
       input_pose.linear() = input_quaternion.toRotationMatrix();
       VectorX<double>
@@ -145,10 +205,22 @@ void PoseSmoother::DoCalcDiscreteVariableUpdates(
           state_vector(13));
       state_vector.head(7) = new_state;
       state_vector(13) = kDiscreteUpdateInSec;
+    } else {
+
+      // Since the current sample has been rejected, the time since the last
+      // sample must be incremented suitably.
+      state_vector(13) += kDiscreteUpdateInSec;
+    }
+
+    state_basic_vector->get_mutable_value() = state_vector;
   } else {
-    // Since the current sample has been rejected, the time since the last
-    // sample must be incremented suitably.
-    state_vector(13) += kDiscreteUpdateInSec;
+    VectorX<double> padded_state = VectorX<double>::Zero(13);
+    padded_state.head(7) = input_pose_vector;
+    state_basic_vector->get_mutable_value() = padded_state;
+
+    drake::log()->info("Unsmoother object state x {}, {}, {}",
+                       input_pose_vector(0), input_pose_vector(1),
+                       input_pose_vector(2));
   }
 }
 
@@ -176,7 +248,8 @@ void PoseSmoother::OutputSmoothedState(
   const auto state_value = context.get_discrete_state(0)->get_value();
   Eigen::VectorBlock<VectorX<double>> measured_pose_output =
       output->get_mutable_value();
-  measured_pose_output = state_value;
+  measured_pose_output = state_value.head(13);
+
 }
 } // namespace perception
 } // namespace manipulation

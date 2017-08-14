@@ -8,6 +8,8 @@
 #include "drake/multibody/rigid_body_plant/compliant_contact_model.h"
 #include "drake/multibody/rigid_body_plant/contact_results.h"
 #include "drake/systems/framework/system_common.h"
+#include "drake/common/text_logging.h"
+#include "iiwa_and_object_state_aggregator.h"
 
 namespace drake {
 using systems::Context;
@@ -21,13 +23,14 @@ namespace contact_state_estimator {
 IiwaAndObjectStateAggregator::IiwaAndObjectStateAggregator(
     std::unique_ptr<RigidBodyTreed> iiwa_object_tree, const double period_sec)
     : iiwa_object_tree_(std::move(iiwa_object_tree)),
-      kNumPositions(iiwa_object_tree->get_num_positions()),
-      kNumVelocities(iiwa_object_tree->get_num_velocities()),
+      kNumPositions(iiwa_object_tree_->get_num_positions()),
+      kNumVelocities(iiwa_object_tree_->get_num_velocities()),
       compliant_contact_model_(
           std::make_unique<CompliantContactModel<double>>()) {
   this->set_name("IiwaAndObjectStateAggregator");
   // Add some drake demands for tree num states.
 
+  drake::log()->info("About to add outputportvisualizer");
   // Adds a vector output port for the visualizer state.
   output_port_visualizer_state_ =
       this->DeclareVectorOutputPort(
@@ -35,19 +38,23 @@ IiwaAndObjectStateAggregator::IiwaAndObjectStateAggregator(
               &IiwaAndObjectStateAggregator::CalcVisualizerStateOutput)
           .get_index();
 
+  drake::log()->info("About to add outputportcontactstate");
   // Declares an abstract valued output port for contact information.
   output_port_contact_state_ =
       this->DeclareAbstractOutputPort(
               ContactResults<double>(),
               &IiwaAndObjectStateAggregator::CalcContactResultsOutput)
           .get_index();
+  drake::log()->info("About to add inputport");
 
   input_port_iiwa_state_ =
-      this->DeclareInputPort(systems::kVectorValued, 28).get_index();
+      this->DeclareInputPort(systems::kVectorValued,
+                             kNumPositions + kNumVelocities - 13).get_index();
   input_port_object_state_ =
       this->DeclareInputPort(systems::kVectorValued, 13).get_index();
   this->DeclareDiscreteState(kNumPositions + 7);
   this->DeclarePeriodicDiscreteUpdate(period_sec);
+  drake::log()->info("IIwa object state aggregator");
 }
 
 void IiwaAndObjectStateAggregator::DoCalcDiscreteVariableUpdates(
@@ -59,6 +66,16 @@ void IiwaAndObjectStateAggregator::DoCalcDiscreteVariableUpdates(
   const systems::BasicVector<double>* object_state =
       this->EvalVectorInput(context, input_port_object_state_);
 
+  VectorX<double> object_state_vector = object_state->CopyToVector();
+
+//  drake::log()->info("object_state_vector {}", object_state_vector(0));
+//  drake::log()->info("object_state_vector {}", object_state_vector(1));
+//  drake::log()->info("object_state_vector {}", object_state_vector(2));
+//  drake::log()->info("object_state_vector {}", object_state_vector(3));
+//  drake::log()->info("object_state_vector {}", object_state_vector(4));
+//  drake::log()->info("object_state_vector {}", object_state_vector(5));
+//  drake::log()->info("object_state_vector {}", object_state_vector(6));
+
   // this->EvalAbstractInput(context, 0);
   DRAKE_ASSERT(iiwa_state != nullptr);
   DRAKE_ASSERT(object_state != nullptr);
@@ -69,7 +86,13 @@ void IiwaAndObjectStateAggregator::DoCalcDiscreteVariableUpdates(
   state_value = VectorX<double>::Zero(kNumPositions + kNumVelocities);
   VectorX<double> iiwa_state_vector = iiwa_state->CopyToVector();
   state_value.segment<14>(0) = iiwa_state_vector.head(14);
-  state_value.segment<7>(14) = object_state->CopyToVector();
+  state_value.segment<7>(14) = object_state_vector;
+
+  drake::log()->info("Aggregator object state x {}, {}, {}",
+                     object_state_vector(0), object_state_vector(1),
+                     object_state_vector(2));
+
+
 }
 
 void IiwaAndObjectStateAggregator::CalcVisualizerStateOutput(
