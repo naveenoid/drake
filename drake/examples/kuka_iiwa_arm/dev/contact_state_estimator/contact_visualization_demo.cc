@@ -69,7 +69,6 @@ std::unique_ptr<RigidBodyTreed> BuildDemoTree(
 
 int DoMain() {
   lcm::DrakeLcm lcm;
-  drake::log()->info("Starting new demo");
   systems::DiagramBuilder<double> builder;
 
   auto iiwa_status_sub = builder.AddSystem(
@@ -93,8 +92,8 @@ int DoMain() {
   rot_mat.col(2) = Eigen::Vector3d::UnitZ();
   rot_mat.col(3) = Eigen::Vector3d::UnitY();
 
-    auto z_transform = Eigen::AngleAxisd(0.5*M_PI, Eigen::Vector3d::UnitZ());
-    auto x_transform = Eigen::AngleAxisd(0.015*M_PI, Eigen::Vector3d::UnitX());
+    auto z_transform = Eigen::AngleAxisd(-0.5*M_PI, Eigen::Vector3d::UnitZ());
+    auto x_transform = Eigen::AngleAxisd(0.03*M_PI, Eigen::Vector3d::UnitX());
 
 //  auto z_transform = Eigen::AngleAxisd(0.5*M_PI, Eigen::Vector3d::UnitZ());
 //  auto x_transform = Eigen::AngleAxisd(0.5*M_PI, Eigen::Vector3d::UnitX());
@@ -102,8 +101,9 @@ int DoMain() {
   X_WO.linear() = x_transform * z_transform * rot_mat;
   Eigen::Vector3d translator;
   translator = Eigen::Vector3d::Zero();
-  //translator<< 0.0, 0.0, 0;
-  translator<< 0.565, -0.055, 0;
+  translator<< 0.0, 0.0, 0.0;
+  //translator<< 0.565, -0.055, 0;
+  //translator<< 0.765, -0.55, 0;
   X_WO.translate(translator);
 
   drake::log()->info("About to add pose extractor");

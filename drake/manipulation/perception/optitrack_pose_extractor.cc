@@ -33,7 +33,6 @@ OptitrackPoseExtractor::OptitrackPoseExtractor(
   // parameterization.
   this->DeclareDiscreteState(7);
   this->DeclarePeriodicDiscreteUpdate(optitrack_lcm_status_period);
-  drake::log()->info("Just created OptitrackPoseExtractor");
 }
 
 void OptitrackPoseExtractor::DoCalcDiscreteVariableUpdates(
@@ -71,16 +70,21 @@ void OptitrackPoseExtractor::DoCalcDiscreteVariableUpdates(
                                          rigid_bodies[object_id_].xyz[1],
                                          rigid_bodies[object_id_].xyz[2]);
 
-  drake::log()->info("Raw object position x {}, {}, {}",
+  drake::log()->info("Raw position {}, {}, {}",
                      rigid_bodies[object_id_].xyz[0],
                      rigid_bodies[object_id_].xyz[1],
                      rigid_bodies[object_id_].xyz[2]);
 
   X_OB.makeAffine();
-  Isometry3<double> X_WB = X_WO_ * X_OB;
+  drake::log()->info("Raw orientation {}, {}, {}",
+                       rigid_bodies[object_id_].quat[3],
+                     rigid_bodies[object_id_].quat[3],
+                       rigid_bodies[object_id_].xyz[2]);
+
+    Isometry3<double> X_WB = X_WO_ * X_OB;
 
   VectorX<double> trans = X_WB.translation();
-  drake::log()->info("transformed object position x {}, {}, {}",
+  drake::log()->info("transformed  position x {}, {}, {}",
                      trans(0), trans(1), trans(2));
 
   state_value.segment<3>(0) = X_WB.translation();
