@@ -91,6 +91,10 @@ int DoMain() {
   rot_mat.col(0) = -Eigen::Vector3d::UnitX();
   rot_mat.col(1) = Eigen::Vector3d::UnitZ();
   rot_mat.col(2) = Eigen::Vector3d::UnitY();
+    // for canned demo 1
+//    rot_mat.col(0) = Eigen::Vector3d::UnitY();
+//    rot_mat.col(1) = Eigen::Vector3d::UnitZ();
+//    rot_mat.col(2) = Eigen::Vector3d::UnitX();
 
   // The following params have been carefully hand tuned to fit the canned_multi_arm_demo_1
   // dataset. The reason for a deviation of these params from the expected
@@ -101,24 +105,28 @@ int DoMain() {
   auto z_transform = Eigen::AngleAxisd(-0.023*M_PI, Eigen::Vector3d::UnitZ());
 
   X_WO.linear() = z_transform * rot_mat;
+    X_WO.linear() = rot_mat;
   Eigen::Vector3d translator;
   translator = Eigen::Vector3d::Zero();
-  translator<< -0.343, -0.0825, 0.06;
+    // for canned demo 1
+  //translator<< 0.685, -0.03, 0.06;
+
+  //  translator << -0.323, 0.005, +0.017;
   X_WO.translate(translator);
 
   drake::log()->info("About to add pose extractor");
   // 0, 1 seem to be robot bases
   // Update to thje new version of the pose extractor
   auto optitrack_pose_extractor = builder.AddSystem<OptitrackPoseExtractor>(2,
-  X_WO, 0.005 /* pose extractor period */);
+  X_WO, 0.01 /* pose extractor period */);
   optitrack_pose_extractor->set_name("optitrack pose extractor");
+//
+//  auto pose_smoother = builder.AddSystem<PoseSmoother>(
+//      1.0 /* max_linear_velocity */, M_PI/3 /* max_radial_velocity */,
+//      9 /* window_size */, 0.01 /* lcm status period */);
 
-  auto pose_smoother = builder.AddSystem<PoseSmoother>(
-      1.0 /* max_linear_velocity */, M_PI/3 /* max_radial_velocity */,
-      3 /* window_size */, 0.005 /* lcm status period */);
-
-//    auto pose_smoother = builder.AddSystem<PoseSmoother>(
-//            0.01 /*lcm status period */);
+    auto pose_smoother = builder.AddSystem<PoseSmoother>(
+            0.01 /*lcm status period */);
 
   /// Create a custom method for the tree builder stuff.
   auto iiwa_object_tree =

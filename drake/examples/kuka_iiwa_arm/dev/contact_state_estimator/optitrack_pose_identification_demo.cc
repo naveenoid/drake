@@ -44,7 +44,7 @@ const char* const kIiwaUrdf =
     "drake/manipulation/models/iiwa_description/urdf/"
     "iiwa14_primitive_collision.urdf";
 const char* const kObjectUrdf =
-        "drake/examples/kuka_iiwa_arm/models/objects/big_box.urdf";
+        "drake/examples/kuka_iiwa_arm/models/objects/black_box.urdf";
 const int kNumRobotJoints = 7;
 const char* const kLcmIiwaStatusChannel = "IIWA_STATUS";
 const char* const kLcmOptitrackChannel = "OPTITRACK_FRAMES";
@@ -89,9 +89,9 @@ int DoMain() {
   // from experimentation
   Eigen::Isometry3d X_WO = Eigen::Isometry3d::Identity();
   Eigen::Matrix3d rot_mat;
-  rot_mat.col(0) = -Eigen::Vector3d::UnitX();
+  rot_mat.col(0) = Eigen::Vector3d::UnitY();
   rot_mat.col(1) = Eigen::Vector3d::UnitZ();
-  rot_mat.col(2) = Eigen::Vector3d::UnitY();
+  rot_mat.col(2) = Eigen::Vector3d::UnitX();
 
   //auto z_transform = Eigen::AngleAxisd(0.5 * M_PI, Eigen::Vector3d::UnitZ());
   //auto x_transform = Eigen::AngleAxisd(0.015 * M_PI, Eigen::Vector3d::UnitX());
@@ -104,22 +104,22 @@ int DoMain() {
   Eigen::Vector3d translator;
   translator = Eigen::Vector3d::Zero();
   // translator<< 0.0, 0.0, 0;
-  translator << -0.343, -0.1627, 0.005;
+  translator << -0.323, 0.005, +0.017;
   X_WO.translate(translator);
 
   drake::log()->info("About to add pose extractor");
   // 0, 1 seem to be robot bases
   // Update to thje new version of the pose extractor
   auto optitrack_pose_extractor = builder.AddSystem<OptitrackPoseExtractor>(
-      2, X_WO, 0.005 /* pose extractor period */);
+      2, X_WO, 0.01 /* pose extractor period */);
   optitrack_pose_extractor->set_name("optitrack pose extractor");
 
     auto pose_smoother = builder.AddSystem<PoseSmoother>(
-        1.0 /* max_linear_velocity */, 0.5*M_PI /* max_radial_velocity */,
-        5 /* window_size */, 0.005 /* lcm status period */);
-//
+        1.5 /* max_linear_velocity */, 0.33*M_PI /* max_radial_velocity */,
+        5 /* window_size */, 0.01 /* lcm status period */);
+
 //  auto pose_smoother =
-//      builder.AddSystem<PoseSmoother>(0.01 /*lcm status period */);
+//      builder.AddSystem<PoseSmoother>(0.005 /*lcm status period */);
 
   /// Create a custom method for the tree builder stuff.
   auto iiwa_object_tree =
@@ -133,7 +133,7 @@ int DoMain() {
   drake::log()->info("About to add StateAggregator");
   auto iiwa_object_state_aggregator =
       builder.AddSystem<IiwaAndObjectStateAggregator>(
-          std::move(iiwa_object_tree), 0.005 /* period_sec */);
+          std::move(iiwa_object_tree), 0.001 /* period_sec */);
   iiwa_object_state_aggregator->set_name("iiwa object state aggregator");
 
   drake::log()->info("About to add visuaLizer");
@@ -156,18 +156,6 @@ int DoMain() {
   builder.Connect(pose_smoother->get_smoothed_state_output_port(),
                   iiwa_object_state_aggregator->get_input_port_object_state());
   // insert a pose smoother here.
-
-  drake::log()->info("pose_smoother->get_smoothed_state_output_port() {}",
-                     pose_smoother->get_smoothed_state_output_port().size());
-
-  drake::log()->info(
-      "stateaggregator dim {}",
-      iiwa_object_state_aggregator->get_input_port_object_state().size());
-
-  drake::log()->info("Conecting state aggregator to visualizer");
-
-  drake::log()->info("drake visualizer {}",
-                     drake_visualizer->get_input_port(0).size());
   builder.Connect(
       iiwa_object_state_aggregator->get_output_port_visualizer_state(),
       drake_visualizer->get_input_port(0));

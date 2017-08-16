@@ -168,13 +168,11 @@ void PoseSmoother::DoCalcDiscreteVariableUpdates(
   Isometry3<double> input_pose = VectorToIsometry3(input_pose_vector);
 
   if(kSmoothingMode) {
-//      drake::log()->info("about to smooth");
     Isometry3<double> current_pose = VectorToIsometry3(state_vector.head(7));
 
     Quaterniond input_quaternion = Isometry3ToQuaternion(input_pose);
     Quaterniond current_quaternion = Isometry3ToQuaternion(current_pose);
 
-    // If t = 0
     if (state_vector(13) == 0) {
       state_vector(13) = kDiscreteUpdateInSec;
       current_pose = input_pose;
@@ -206,7 +204,7 @@ void PoseSmoother::DoCalcDiscreteVariableUpdates(
       state_vector.head(7) = new_state;
       state_vector(13) = kDiscreteUpdateInSec;
     } else {
-
+      drake::log()->info("Point rejected");
       // Since the current sample has been rejected, the time since the last
       // sample must be incremented suitably.
       state_vector(13) += kDiscreteUpdateInSec;

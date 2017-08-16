@@ -68,14 +68,6 @@ void IiwaAndObjectStateAggregator::DoCalcDiscreteVariableUpdates(
 
   VectorX<double> object_state_vector = object_state->CopyToVector();
 
-//  drake::log()->info("object_state_vector {}", object_state_vector(0));
-//  drake::log()->info("object_state_vector {}", object_state_vector(1));
-//  drake::log()->info("object_state_vector {}", object_state_vector(2));
-//  drake::log()->info("object_state_vector {}", object_state_vector(3));
-//  drake::log()->info("object_state_vector {}", object_state_vector(4));
-//  drake::log()->info("object_state_vector {}", object_state_vector(5));
-//  drake::log()->info("object_state_vector {}", object_state_vector(6));
-
   DRAKE_ASSERT(iiwa_state != nullptr);
   DRAKE_ASSERT(object_state != nullptr);
 
@@ -84,8 +76,10 @@ void IiwaAndObjectStateAggregator::DoCalcDiscreteVariableUpdates(
 
   state_value = VectorX<double>::Zero(kNumPositions + kNumVelocities);
   VectorX<double> iiwa_state_vector = iiwa_state->CopyToVector();
-  state_value.segment<kNumPositions - 7>(0) = iiwa_state_vector.head(kNumPositions - 7);
-  state_value.segment<7>(kNumPositions - 7) = object_state_vector;
+  state_value.segment(0, kNumPositions - 7) = iiwa_state_vector;
+  state_value.segment(kNumPositions - 7, 7) = object_state_vector.head(7);
+  //state_value.segment(kNumVelocities-6, kNumPositions) = iiwa_state_vector.tail(kNumVelocities - 6);
+  //state_value.segment(6, kNumPositions + kNumVelocities - 6) = object_state_vector.tail(6);
 //
 //  drake::log()->info("Aggregator object position {}, {}, {}",
 //                     object_state_vector(0), object_state_vector(1),

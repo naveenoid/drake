@@ -56,7 +56,14 @@ void OptitrackPoseExtractor::DoCalcDiscreteVariableUpdates(
       rigid_bodies[object_id_].quat[3], rigid_bodies[object_id_].quat[0],
       rigid_bodies[object_id_].quat[1], rigid_bodies[object_id_].quat[2]);
 
-  // Transform from world frame W to rigid body frame B.
+    drake::log()->info("Raw object position {}, {}, {}",
+                       rigid_bodies[object_id_].xyz[0], rigid_bodies[object_id_].xyz[1],
+                       rigid_bodies[object_id_].xyz[2]);
+//    drake::log()->info("Smoother object quaternion {}, {}, {}, {}",
+//                       state_vector(3), state_vector(4),
+//                       state_vector(5), state_vector(6));
+
+    // Transform from world frame W to rigid body frame B.
   Isometry3<double> X_OB;
   X_OB.linear() = quaternion.toRotationMatrix();
   X_OB.translation() = Eigen::Vector3d(rigid_bodies[object_id_].xyz[0],
@@ -64,11 +71,13 @@ void OptitrackPoseExtractor::DoCalcDiscreteVariableUpdates(
                                          rigid_bodies[object_id_].xyz[2]);
 
   X_OB.makeAffine();
-
-    Isometry3<double> X_WB = X_WO_ * X_OB;
+  Isometry3<double> X_WB = X_WO_ * X_OB;
 
   VectorX<double> trans = X_WB.translation();
   VectorX<double> quat_rot = Eigen::Quaterniond(X_WB.linear()).coeffs();
+
+    drake::log()->info("Transformed object position {}, {}, {}",
+                       trans(0), trans(1),trans(2));
 
   state_value.segment<3>(0) = X_WB.translation();
   state_value.segment<4>(3) = Eigen::Quaterniond(X_WB.linear()).coeffs();
