@@ -7,6 +7,7 @@ install(
     name = "install_data",
     visibility = ["//visibility:public"],
     deps = [
+        "//drake/manipulation/models/gelsight_description:install_data",
         "//drake/manipulation/models/iiwa_description:install_data",
         "//drake/manipulation/models/jaco_description:install_data",
         "//drake/manipulation/models/wsg_50_description:install_data",
