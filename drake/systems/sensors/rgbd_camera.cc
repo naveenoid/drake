@@ -63,8 +63,8 @@ const int kPortStateInput = 0;
 
 // TODO(kunimatsu-tri) Add support for the arbitrary clipping planes and
 // background color.
-const double kClippingPlaneNear = 0.01;
-const double kClippingPlaneFar = 100.;
+const double kClippingPlaneNear = 0.001;
+const double kClippingPlaneFar = 5.;
 
 // TODO(kunimatsu-tri) Add support for the arbitrary image size.
 const int kImageWidth = 640;  // In pixels

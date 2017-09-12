@@ -30,6 +30,9 @@
 #include "drake/systems/framework/diagram_builder.h"
 #include "drake/systems/lcm/lcm_publisher_system.h"
 #include "drake/systems/primitives/constant_vector_source.h"
+#include "drake/systems/lcm/lcm_publisher_system.h"
+#include "drake/systems/sensors/image_to_lcm_image_array_t.h"
+#include "drake/systems/sensors/rgbd_camera.h"
 
 DEFINE_int32(target, 0, "ID of the target to pick.");
 DEFINE_double(orientation, 2 * M_PI, "Yaw angle of the box.");
@@ -56,6 +59,10 @@ using systems::Simulator;
 using manipulation::util::ModelInstanceInfo;
 using manipulation::planner::RobotPlanInterpolator;
 using manipulation::util::WorldSimTreeBuilder;
+using systems::sensors::RgbdCamera;
+using systems::sensors::RgbdCameraDiscrete;
+using systems::sensors::ImageToLcmImageArrayT;
+using systems::lcm::LcmPublisherSystem;
 
 const char kIiwaUrdf[] =
     "drake/manipulation/models/iiwa_description/urdf/"
@@ -74,6 +81,12 @@ const double kTableTopZInWorld = 0.736 + 0.057 / 2;
 // TODO(sam.creasey) fix this
 const Eigen::Vector3d kRobotBase(0, 0, kTableTopZInWorld);
 const Eigen::Vector3d kTableBase(0.243716, 0.625087, 0.);
+
+
+constexpr char kColorCameraFrameName[] = "color_camera_optical_frame";
+constexpr char kDepthCameraFrameName[] = "depth_camera_optical_frame";
+constexpr char kLabelCameraFrameName[] = "label_camera_optical_frame";
+
 
 struct Target {
   std::string model_name;
@@ -122,6 +135,11 @@ std::unique_ptr<systems::RigidBodyPlant<double>> BuildCombinedPlant(
       "drake/manipulation/models/wsg_50_description"
           "/sdf/schunk_wsg_50_ball_contact.sdf");
 
+  tree_builder->StoreModel(
+      "gelsight",
+      "drake/manipulation/models/gelsight_description"
+          "/urdf/simple_gelsight.urdf");
+
   // The main table which the arm sits on.
   tree_builder->AddFixedModelInstance("table",
                                       kTableBase,
@@ -148,6 +166,12 @@ std::unique_ptr<systems::RigidBodyPlant<double>> BuildCombinedPlant(
       "wsg", tree_builder->tree().findFrame("iiwa_frame_ee"),
       drake::multibody::joints::kFixed);
   *wsg_instance = tree_builder->get_model_info_for_instance(wsg_id);
+  drake::log()->info(" Finger frame : {}", tree_builder->tree().getBodyOrFrameName(8));
+
+  //Adding the gelsight to the left finger.
+  tree_builder->AddModelInstanceToFrame(
+      "gelsight", tree_builder->tree().findFrame("left_finger_tip"),
+      drake::multibody::joints::kFixed);
 
   return std::make_unique<systems::RigidBodyPlant<double>>(
       tree_builder->Build());
@@ -231,12 +255,11 @@ int DoMain(void) {
                          target.model_name,
                          box_origin, Vector3<double>(0, 0, FLAGS_orientation),
                          &iiwa_instance, &wsg_instance, &box_instance);
-
+  model_ptr->set_normal_contact_parameters(1000 /* penetration stiffness */,
+                                           2 /* dissipation */);
   auto plant = builder.AddSystem<IiwaAndWsgPlantWithStateEstimator<double>>(
       std::move(model_ptr), iiwa_instance, wsg_instance, box_instance);
   plant->set_name("plant");
-  systems::RigidBodyPlant<double> rbp = plant->get_plant();
-  rbp.
 
   auto contact_viz =
       builder.AddSystem<systems::ContactResultsToLcmSystem<double>>(
@@ -307,6 +330,48 @@ int DoMain(void) {
   builder.Connect(state_machine->get_output_port_iiwa_plan(),
                   iiwa_trajectory_generator->get_plan_input_port());
 
+  // Adding the gelsight system.
+  Eigen::Isometry3d camera_pose = Eigen::Isometry3d::Identity();
+  camera_pose.linear() = Eigen::AngleAxisd(0.5 * M_PI, Eigen::Vector3d::UnitZ()) * Eigen::Matrix3d::Identity();
+  camera_pose.translation()[1] -= 0.02;
+
+  auto rgbd_camera_frame = std::allocate_shared<RigidBodyFrame<double>>(
+      Eigen::aligned_allocator<RigidBodyFrame<double>>(),
+      "rgbd_camera", plant->get_tree().FindBody("gelsight_camera_head")
+  );
+
+  auto rgbd_camera = builder.AddSystem<RgbdCameraDiscrete>(std::make_unique<RgbdCamera>("rgbd_camera", plant->get_tree(),*rgbd_camera_frame.get(), 0.001 /*near */, 0.1, (130.0/180) * M_PI /*FoV */, true), 0.03333333);
+  rgbd_camera->set_name("rgbd_camera");
+
+  auto image_to_lcm_image_array =
+      builder.template AddSystem<ImageToLcmImageArrayT>(
+          kColorCameraFrameName, kDepthCameraFrameName, kLabelCameraFrameName);
+  image_to_lcm_image_array->set_name("converter");
+
+  constexpr char kImageArrayLcmChannelName[] = "DRAKE_RGBD_CAMERA_IMAGES";
+  constexpr double kImageArrayPublishPeriod{0.01};
+  auto image_array_lcm_publisher = builder.template AddSystem(
+      systems::lcm::LcmPublisherSystem::Make<robotlocomotion::image_array_t>(
+          kImageArrayLcmChannelName, &lcm));
+  image_array_lcm_publisher->set_name("publisher");
+  image_array_lcm_publisher->set_publish_period(kImageArrayPublishPeriod);
+
+  builder.Connect(
+      plant->get_output_port_plant_state(),
+      rgbd_camera->state_input_port());
+
+  builder.Connect(
+      rgbd_camera->color_image_output_port(),
+      image_to_lcm_image_array->color_image_input_port());
+
+  builder.Connect(
+      rgbd_camera->depth_image_output_port(),
+      image_to_lcm_image_array->depth_image_input_port());
+
+  builder.Connect(
+      image_to_lcm_image_array->image_array_t_msg_output_port(),
+      image_array_lcm_publisher->get_input_port(0));
+
   auto sys = builder.Build();
   Simulator<double> simulator(*sys);
   simulator.Initialize();
@@ -322,6 +387,7 @@ int DoMain(void) {
       plan_source_context.get_time(),
       Eigen::VectorXd::Zero(7),
       plan_source_context.get_mutable_state());
+
 
   // Step the simulator in some small increment.  Between steps, check
   // to see if the state machine thinks we're done, and if so that the
