@@ -5,13 +5,13 @@
 <robot name="gelsight_sensor">
   <link name="gelsight_base_link">
     <inertial>
-      <origin xyz="0 0 -0.02" rpy="1.570796  0 0" />
+      <origin xyz="0 0 0" rpy="0 0 0" />
       <mass value="0.001" />
             <inertia ixx="0.0.0021233" ixy="0" ixz="0" iyy="0.0021233" iyz="0"
                 izz="0.004235" />
     </inertial>
     <visual>
-      <origin xyz="0 0.0 0.0" rpy="1.570796  0 0" />
+      <origin xyz="0 0.0 0.0" rpy="0  0 0" />
       <geometry>
         <cylinder length="0.02" radius="0.02"/>
       </geometry>
@@ -33,7 +33,7 @@
                    izz="0.0003125" />
         </inertial>
         <visual>
-          <origin xyz="0 0.01 0" rpy="0 0 0" />
+          <origin xyz="0 0.0 0" rpy="0 0 0" />
           <geometry>
             <sphere radius="0.015" />
           </geometry>
@@ -42,7 +42,7 @@
           </material>
         </visual>
         <collision>
-          <origin xyz="0 0.01 0.0" rpy="0  0 0" />
+          <origin xyz="0 0.0 0.0" rpy="0  0 0" />
           <geometry>
             <sphere radius="0.015" />
           </geometry>

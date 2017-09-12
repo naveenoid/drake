@@ -332,15 +332,15 @@ int DoMain(void) {
 
   // Adding the gelsight system.
   Eigen::Isometry3d camera_pose = Eigen::Isometry3d::Identity();
-  camera_pose.linear() = Eigen::AngleAxisd(0.5 * M_PI, Eigen::Vector3d::UnitZ()) * Eigen::Matrix3d::Identity();
+  camera_pose.linear() = Eigen::AngleAxisd(0.5 * M_PI, Eigen::Vector3d::UnitY()) * Eigen::Matrix3d::Identity();
   camera_pose.translation()[1] -= 0.02;
 
   auto rgbd_camera_frame = std::allocate_shared<RigidBodyFrame<double>>(
       Eigen::aligned_allocator<RigidBodyFrame<double>>(),
-      "rgbd_camera", plant->get_tree().FindBody("gelsight_camera_head")
-  );
+      "rgbd_camera", plant->get_tree().FindBody("gelsight_camera_head"),
+      camera_pose);
 
-  auto rgbd_camera = builder.AddSystem<RgbdCameraDiscrete>(std::make_unique<RgbdCamera>("rgbd_camera", plant->get_tree(),*rgbd_camera_frame.get(), 0.001 /*near */, 0.1, (130.0/180) * M_PI /*FoV */, true), 0.03333333);
+  auto rgbd_camera = builder.AddSystem<RgbdCameraDiscrete>(std::make_unique<RgbdCamera>("rgbd_camera", plant->get_tree(),*rgbd_camera_frame.get(), 0.001 /*near */, 0.1, (130.0/180) * M_PI /*FoV */, true), 0.3);
   rgbd_camera->set_name("rgbd_camera");
 
   auto image_to_lcm_image_array =

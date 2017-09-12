@@ -182,7 +182,7 @@
     </link>
     <frame name="left_finger_tip">
           <link>left_finger</link>
-          <pose>0.02 0.03 0 0 0 -1.570796</pose>
+          <pose>0.02 0.025 0 0  -1.570796 0</pose>
         </frame>
     <link name='left_pusher'>
       <pose frame=''>0.028 0.037 0 0 0 -0.909</pose>
