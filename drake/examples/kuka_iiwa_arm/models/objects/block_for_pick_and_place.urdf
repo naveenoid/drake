@@ -10,7 +10,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <box size="0.03 0.03 0.2" />
+        <box size="0.06 0.03 0.2" />
       </geometry>
       <material name="red">
         <color rgba="0.8 0.1 0.1 0.9" />
@@ -34,55 +34,55 @@
      -->
     <collision>
       <geometry>
-        <box size="0.029 0.029 0.199" />
+        <box size="0.059 0.029 0.199" />
       </geometry>
     </collision>
 
     <collision>
-      <origin xyz="-0.015 -0.015 -0.1" rpy="0 0 0"/>
+      <origin xyz="-0.03 -0.015 -0.1" rpy="0 0 0"/>
       <geometry>
         <sphere radius="1e-7"/>
       </geometry>
     </collision>
     <collision>
-      <origin xyz="-0.015 0.015 -0.1" rpy="0 0 0"/>
+      <origin xyz="-0.03 0.015 -0.1" rpy="0 0 0"/>
       <geometry>
         <sphere radius="1e-7"/>
       </geometry>
     </collision>
     <collision>
-      <origin xyz="0.015 0.015 -0.1" rpy="0 0 0"/>
+      <origin xyz="0.03 0.015 -0.1" rpy="0 0 0"/>
       <geometry>
         <sphere radius="1e-7"/>
       </geometry>
     </collision>
     <collision>
-      <origin xyz="0.015 -0.015 -0.1" rpy="0 0 0"/>
+      <origin xyz="0.03 -0.015 -0.1" rpy="0 0 0"/>
       <geometry>
         <sphere radius="1e-7"/>
       </geometry>
     </collision>
 
     <collision>
-      <origin xyz="-0.015 -0.015 0.1" rpy="0 0 0"/>
+      <origin xyz="-0.03 -0.015 0.1" rpy="0 0 0"/>
       <geometry>
         <sphere radius="1e-7"/>
       </geometry>
     </collision>
     <collision>
-      <origin xyz="-0.015 0.015 0.1" rpy="0 0 0"/>
+      <origin xyz="-0.03 0.015 0.1" rpy="0 0 0"/>
       <geometry>
         <sphere radius="1e-7"/>
       </geometry>
     </collision>
     <collision>
-      <origin xyz="0.015 0.015 0.1" rpy="0 0 0"/>
+      <origin xyz="0.03 0.015 0.1" rpy="0 0 0"/>
       <geometry>
         <sphere radius="1e-7"/>
       </geometry>
     </collision>
     <collision>
-      <origin xyz="0.015 -0.015 0.1" rpy="0 0 0"/>
+      <origin xyz="0.03 -0.015 0.1" rpy="0 0 0"/>
       <geometry>
         <sphere radius="1e-7"/>
       </geometry>

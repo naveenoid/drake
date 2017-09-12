@@ -140,6 +140,9 @@ std::unique_ptr<systems::RigidBodyPlant<double>> BuildCombinedPlant(
       "drake/manipulation/models/gelsight_description"
           "/urdf/simple_gelsight.urdf");
 
+  tree_builder->StoreModel(
+      "bottle2", "drake/examples/kuka_iiwa_arm/models/objects/bottle.urdf");
+
   // The main table which the arm sits on.
   tree_builder->AddFixedModelInstance("table",
                                       kTableBase,
@@ -157,8 +160,10 @@ std::unique_ptr<systems::RigidBodyPlant<double>> BuildCombinedPlant(
   int box_id = 0;
   int iiwa_id = tree_builder->AddFixedModelInstance("iiwa", kRobotBase);
   *iiwa_instance = tree_builder->get_model_info_for_instance(iiwa_id);
-
-  box_id = tree_builder->AddFloatingModelInstance("target", box_position,
+//
+//  box_id = tree_builder->AddFloatingModelInstance("target", box_position,
+//                                                  box_orientation);
+  box_id = tree_builder->AddFloatingModelInstance("bottle2", box_position,
                                                   box_orientation);
   *box_instance = tree_builder->get_model_info_for_instance(box_id);
 
@@ -255,12 +260,12 @@ int DoMain(void) {
                          target.model_name,
                          box_origin, Vector3<double>(0, 0, FLAGS_orientation),
                          &iiwa_instance, &wsg_instance, &box_instance);
-  model_ptr->set_normal_contact_parameters(1000 /* penetration stiffness */,
+  model_ptr->set_normal_contact_parameters(1500 /* penetration stiffness */,
                                            2 /* dissipation */);
   auto plant = builder.AddSystem<IiwaAndWsgPlantWithStateEstimator<double>>(
       std::move(model_ptr), iiwa_instance, wsg_instance, box_instance);
-  plant->set_name("plant");
 
+  plant->set_name("plant");
   auto contact_viz =
       builder.AddSystem<systems::ContactResultsToLcmSystem<double>>(
           plant->get_tree());
@@ -276,6 +281,8 @@ int DoMain(void) {
   auto drake_visualizer = builder.AddSystem<systems::DrakeVisualizer>(
       plant->get_plant().get_rigid_body_tree(), &lcm);
 
+  drake_visualizer->set_publish_period(0.01 /* period (sec)*/);
+//  plant->get_plant().
   builder.Connect(plant->get_output_port_plant_state(),
                   drake_visualizer->get_input_port(0));
 
@@ -332,7 +339,7 @@ int DoMain(void) {
 
   // Adding the gelsight system.
   Eigen::Isometry3d camera_pose = Eigen::Isometry3d::Identity();
-  camera_pose.linear() = Eigen::AngleAxisd(0.5 * M_PI, Eigen::Vector3d::UnitY()) * Eigen::Matrix3d::Identity();
+  camera_pose.linear() = Eigen::AngleAxisd(-0.5 * M_PI, Eigen::Vector3d::UnitY()) * Eigen::Matrix3d::Identity();
   camera_pose.translation()[1] -= 0.02;
 
   auto rgbd_camera_frame = std::allocate_shared<RigidBodyFrame<double>>(
@@ -340,7 +347,9 @@ int DoMain(void) {
       "rgbd_camera", plant->get_tree().FindBody("gelsight_camera_head"),
       camera_pose);
 
-  auto rgbd_camera = builder.AddSystem<RgbdCameraDiscrete>(std::make_unique<RgbdCamera>("rgbd_camera", plant->get_tree(),*rgbd_camera_frame.get(), 0.001 /*near */, 0.1, (130.0/180) * M_PI /*FoV */, true), 0.3);
+  auto rgbd_camera = builder.AddSystem<RgbdCameraDiscrete>(std::make_unique<RgbdCamera>(
+      "rgbd_camera", plant->get_tree(),*rgbd_camera_frame.get(),
+      0.001 /*near */, 0.1, (130.0/180) * M_PI /*FoV */, true), 0.1);
   rgbd_camera->set_name("rgbd_camera");
 
   auto image_to_lcm_image_array =
@@ -381,7 +390,8 @@ int DoMain(void) {
   simulator.get_mutable_integrator()->set_maximum_step_size(FLAGS_dt);
   simulator.get_mutable_integrator()->set_fixed_step_mode(true);
 
-  //simulator.set_publish_every_time_step(false);
+  simulator.set_publish_at_initialization(true);
+  simulator.set_publish_every_time_step(false);
 
   auto& plan_source_context = sys->GetMutableSubsystemContext(
       *iiwa_trajectory_generator, simulator.get_mutable_context());

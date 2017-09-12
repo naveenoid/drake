@@ -19,9 +19,15 @@
         <color rgba="0.85 0.85 0.925 1" />
       </material>
     </visual>
+    <collision>
+     <origin xyz="0 0.0 0.0" rpy="0  0 0" />
+     <geometry>
+       <cylinder length="0.02" radius="0.02" />
+     </geometry>
+    </collision>
    </link>
    <joint name="gelsight_camera_joint" type="fixed">
-     <origin rpy="0 0 0" xyz="0 0.0 0"/>
+     <origin rpy="0 0 0" xyz="0.0 0.00 0"/>
      <parent link="gelsight_base_link"/>
      <child link="gelsight_camera_head"/>
    </joint>
@@ -35,7 +41,7 @@
         <visual>
           <origin xyz="0 0.0 0" rpy="0 0 0" />
           <geometry>
-            <sphere radius="0.015" />
+            <sphere radius="0.017" />
           </geometry>
           <material name="white">
             <color rgba="1.0 1.0 1.0 1.0"/>

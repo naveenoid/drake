@@ -14,7 +14,7 @@ namespace {
 using manipulation::planner::ConstraintRelaxingIk;
 
 // Position the gripper 30cm above the object before grasp.
-const double kPreGraspHeightOffset = 0.3;
+const double kPreGraspHeightOffset = 0.2;
 
 // Computes the desired end effector pose in the world frame given the object
 // pose in the world frame.
