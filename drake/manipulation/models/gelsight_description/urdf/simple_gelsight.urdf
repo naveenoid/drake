@@ -44,13 +44,13 @@
             <sphere radius="0.017" />
           </geometry>
           <material name="white">
-            <color rgba="1.0 1.0 1.0 1.0"/>
+            <color rgba="1.0 1.0 1.0 0.9"/>
           </material>
         </visual>
         <collision>
           <origin xyz="0 0.0 0.0" rpy="0  0 0" />
           <geometry>
-            <sphere radius="0.015" />
+            <sphere radius="0.017" />
           </geometry>
         </collision>
       </link>

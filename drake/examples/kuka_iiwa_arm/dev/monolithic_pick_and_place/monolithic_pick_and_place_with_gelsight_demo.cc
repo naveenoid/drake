@@ -140,8 +140,8 @@ std::unique_ptr<systems::RigidBodyPlant<double>> BuildCombinedPlant(
       "drake/manipulation/models/gelsight_description"
           "/urdf/simple_gelsight.urdf");
 
-  tree_builder->StoreModel(
-      "bottle2", "drake/examples/kuka_iiwa_arm/models/objects/bottle.urdf");
+//  tree_builder->StoreModel(
+//      "bottle2", "drake/examples/kuka_iiwa_arm/models/objects/bottle.urdf");
 
   // The main table which the arm sits on.
   tree_builder->AddFixedModelInstance("table",
@@ -160,11 +160,11 @@ std::unique_ptr<systems::RigidBodyPlant<double>> BuildCombinedPlant(
   int box_id = 0;
   int iiwa_id = tree_builder->AddFixedModelInstance("iiwa", kRobotBase);
   *iiwa_instance = tree_builder->get_model_info_for_instance(iiwa_id);
-//
-//  box_id = tree_builder->AddFloatingModelInstance("target", box_position,
-//                                                  box_orientation);
-  box_id = tree_builder->AddFloatingModelInstance("bottle2", box_position,
+
+  box_id = tree_builder->AddFloatingModelInstance("target", box_position,
                                                   box_orientation);
+//  box_id = tree_builder->AddFloatingModelInstance("bottle2", box_position,
+//                                                  box_orientation);
   *box_instance = tree_builder->get_model_info_for_instance(box_id);
 
   int wsg_id = tree_builder->AddModelInstanceToFrame(
@@ -260,7 +260,7 @@ int DoMain(void) {
                          target.model_name,
                          box_origin, Vector3<double>(0, 0, FLAGS_orientation),
                          &iiwa_instance, &wsg_instance, &box_instance);
-  model_ptr->set_normal_contact_parameters(1500 /* penetration stiffness */,
+  model_ptr->set_normal_contact_parameters(2500 /* penetration stiffness */,
                                            2 /* dissipation */);
   auto plant = builder.AddSystem<IiwaAndWsgPlantWithStateEstimator<double>>(
       std::move(model_ptr), iiwa_instance, wsg_instance, box_instance);
@@ -339,7 +339,7 @@ int DoMain(void) {
 
   // Adding the gelsight system.
   Eigen::Isometry3d camera_pose = Eigen::Isometry3d::Identity();
-  camera_pose.linear() = Eigen::AngleAxisd(-0.5 * M_PI, Eigen::Vector3d::UnitY()) * Eigen::Matrix3d::Identity();
+  camera_pose.linear() = Eigen::AngleAxisd(-1.5 * M_PI, Eigen::Vector3d::UnitY()) * Eigen::Matrix3d::Identity();
   camera_pose.translation()[1] -= 0.02;
 
   auto rgbd_camera_frame = std::allocate_shared<RigidBodyFrame<double>>(
