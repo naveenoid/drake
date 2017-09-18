@@ -140,9 +140,6 @@ std::unique_ptr<systems::RigidBodyPlant<double>> BuildCombinedPlant(
       "drake/manipulation/models/gelsight_description"
           "/urdf/simple_gelsight.urdf");
 
-//  tree_builder->StoreModel(
-//      "bottle2", "drake/examples/kuka_iiwa_arm/models/objects/bottle.urdf");
-
   // The main table which the arm sits on.
   tree_builder->AddFixedModelInstance("table",
                                       kTableBase,
@@ -163,8 +160,6 @@ std::unique_ptr<systems::RigidBodyPlant<double>> BuildCombinedPlant(
 
   box_id = tree_builder->AddFloatingModelInstance("target", box_position,
                                                   box_orientation);
-//  box_id = tree_builder->AddFloatingModelInstance("bottle2", box_position,
-//                                                  box_orientation);
   *box_instance = tree_builder->get_model_info_for_instance(box_id);
 
   int wsg_id = tree_builder->AddModelInstanceToFrame(
@@ -173,7 +168,7 @@ std::unique_ptr<systems::RigidBodyPlant<double>> BuildCombinedPlant(
   *wsg_instance = tree_builder->get_model_info_for_instance(wsg_id);
   drake::log()->info(" Finger frame : {}", tree_builder->tree().getBodyOrFrameName(8));
 
-  //Adding the gelsight to the left finger.
+  // Adding the gelsight sensor to the left finger.
   tree_builder->AddModelInstanceToFrame(
       "gelsight", tree_builder->tree().findFrame("left_finger_tip"),
       drake::multibody::joints::kFixed);
@@ -416,52 +411,6 @@ int DoMain(void) {
       return 0;
     }
   }
-//
-//  const pick_and_place::WorldState& world_state =
-//      state_machine->world_state(
-//          sys->GetSubsystemContext(*state_machine,
-//                                   simulator.get_context()));
-//  const Isometry3<double>& object_pose = world_state.get_object_pose();
-//  const Vector6<double>& object_velocity = world_state.get_object_velocity();
-//  Isometry3<double> goal = place_locations.back();
-//  goal.translation()(2) += kTableTopZInWorld;
-//  Eigen::Vector3d object_rpy = math::rotmat2rpy(object_pose.rotation());
-//  Eigen::Vector3d goal_rpy = math::rotmat2rpy(goal.rotation());
-//
-//  drake::log()->info("Pose: {} {}",
-//                     object_pose.translation().transpose(),
-//                     object_rpy.transpose());
-//  drake::log()->info("Velocity: {}", object_velocity.transpose());
-//  drake::log()->info("Goal: {} {}",
-//                     goal.translation().transpose(),
-//                     goal_rpy.transpose());
-//
-//  const double position_tolerance = 0.02;
-//  Eigen::Vector3d position_error =
-//      object_pose.translation() - goal.translation();
-//  drake::log()->info("Position error: {}", position_error.transpose());
-//  DRAKE_DEMAND(std::abs(position_error(0)) < position_tolerance);
-//  DRAKE_DEMAND(std::abs(position_error(1)) < position_tolerance);
-//  DRAKE_DEMAND(std::abs(position_error(2)) < position_tolerance);
-//
-//  const double angle_tolerance = 0.0873;  // 5 degrees
-//  Eigen::Vector3d rpy_error = object_rpy - goal_rpy;
-//  drake::log()->info("RPY error: {}", rpy_error.transpose());
-//  DRAKE_DEMAND(std::abs(rpy_error(0)) < angle_tolerance);
-//  DRAKE_DEMAND(std::abs(rpy_error(1)) < angle_tolerance);
-//  DRAKE_DEMAND(std::abs(rpy_error(2)) < angle_tolerance);
-//
-//
-//  const double linear_velocity_tolerance = 0.1;
-//  DRAKE_DEMAND(std::abs(object_velocity(0)) < linear_velocity_tolerance);
-//  DRAKE_DEMAND(std::abs(object_velocity(1)) < linear_velocity_tolerance);
-//  DRAKE_DEMAND(std::abs(object_velocity(2)) < linear_velocity_tolerance);
-//
-//  const double angular_velocity_tolerance = 0.1;
-//  DRAKE_DEMAND(std::abs(object_velocity(3)) < angular_velocity_tolerance);
-//  DRAKE_DEMAND(std::abs(object_velocity(4)) < angular_velocity_tolerance);
-//  DRAKE_DEMAND(std::abs(object_velocity(5)) < angular_velocity_tolerance);
-
   return 0;
 }
 

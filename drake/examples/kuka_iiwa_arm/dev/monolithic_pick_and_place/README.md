@@ -56,3 +56,31 @@ Command line arguments can be passed for : `target` an integer between 1
 and 3 (corresponding to small, medium and large boxes as manipulation
 targets),and for `orientation` - a decimal value for the yaw orientation on
 the table in radians.
+
+
+Launching the gelsight demo
+------------------
+The gelsight demo can be built and launched by using ``bazel run`` with the appropriate
+full path/target specifier. For instance, from the
+``drake-distro/drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place``
+directory, you can execute the demo using :
+
+```
+bazel run :monolithic_pick_and_place_with_gelight_demo --config snopt -- --target=1
+--orientation=-0.0
+```
+
+Alternately, if the ``monolithic_pick_and_place_with_gelsight_demo`` has been built using
+``bazel build``, the demo itself can then be launched by :
+
+```
+$ ./bazel-bin/drake/examples/kuka_iiwa_arm/dev/monolithic_pick_and_place/
+monolithic_pick_and_place_with_gelsight_demo --target=1
+ --orientation=-0.0
+```
+
+Command line arguments can be passed for : `target` an integer between 1
+and 3 (corresponding to small, medium and large boxes as manipulation
+targets),and for `orientation` - a decimal value for the yaw orientation on
+the table in radians. The default version of the demo has only been tested so far
+with no arguments.
