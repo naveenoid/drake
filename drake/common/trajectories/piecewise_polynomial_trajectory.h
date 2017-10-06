@@ -62,10 +62,12 @@ class PiecewisePolynomialTrajectory : public Trajectory {
    */
   Eigen::Index cols() const override { return pp_.cols(); }
 
+  void reset_offset(double
+  )
 
-  double get_start_time() const override { return pp_.getStartTime(); }
+  double get_start_time() const override { return offset_time_ + pp_.getStartTime(); }
 
-  double get_end_time() const override { return pp_.getEndTime(); }
+  double get_end_time() const override { return offset_time_ + pp_.getEndTime(); }
 
   /**
    * @return A reference to the underlying piecewise polynomial.
@@ -76,6 +78,7 @@ class PiecewisePolynomialTrajectory : public Trajectory {
 
  private:
   PiecewisePolynomial<double> pp_;
+  double offset_time_{0};
 };
 
 }  // namespace drake

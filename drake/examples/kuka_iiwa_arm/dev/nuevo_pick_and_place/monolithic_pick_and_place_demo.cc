@@ -1,0 +1,1 @@
+/// A "monolithic" version of the pick-and-place demo

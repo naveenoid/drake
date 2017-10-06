@@ -111,6 +111,95 @@ class IiwaAndWsgPlantWithStateEstimator : public systems::Diagram<T> {
   int output_port_contact_results_t_{-1};
 };
 
+
+
+/// A custom `systems::Diagram` composed of a `systems::RigidBodyPlant`, a
+/// `systems::InverseDynamicsController`, a `systems::PidController`, a
+/// `WSGStatusGenerator`, and a `manipulation::TargetPoseBundleGenerator`.
+/// The `systems::RigidBodyPlant` must be generated from a
+/// `RigidBodyTree` containing a Kuka IIWA and a Schunk WSG
+/// model and one or more additional `RigidBodyTree` model instances. The
+/// resulting diagram exposes input ports for the IIWA state and acceleration
+/// (for the `systems::InverseDynamicsController` of the IIWA robot),
+/// WSGGripperAction and output ports for IIWA and WSG status (state
+/// corresponding to the corresponding IIWA and WSG), the complete
+/// `systems::RigidBodyPlant` state messages of the plant, the ContactResults
+/// output port of the `systems::RigidBodyPlant` and the
+/// target objects for manipulation as well as the PoseBundle from the
+/// `manipulation::TargetPoseBundle`.
+class IiwaWsgAndTargetsPlant : public systems::Diagram<double> {
+ public:
+  /// Constructs the IiwaWsgAndTargetsPlant.
+  /// `combined_plant` :  a `RigidBodyPlant` that is assumed to be generated
+  /// containing a Kuka IIWA and a Schunk WSG model, as well as a "box"
+  /// object. The arguments `iiwa_info`, `wsg_info`, and `box_info` are the
+  /// `ModelInstanceInfo` objects corresponding to the Kuka IIWA, Schunk WSG
+  /// and the box object respectively.
+  IiwaWsgAndTargetsPlant(
+      std::unique_ptr<systems::RigidBodyPlant<double>> combined_plant,
+      const ModelInstanceInfo<double>& iiwa_info,
+      const ModelInstanceInfo<double>& wsg_info,
+      const std::vector<const ModelInstanceInfo<double>>& targets_info);
+
+  const systems::RigidBodyPlant<double>& get_plant() const { return *plant_; }
+
+  const RigidBodyTree<double>& get_tree() const {
+    return plant_->get_rigid_body_tree();
+  }
+
+  const systems::InputPortDescriptor<double>& get_input_port_iiwa_state_command()
+  const {
+    return this->get_input_port(input_port_iiwa_state_command_);
+  }
+
+  const systems::InputPortDescriptor<double>&
+  get_input_port_iiwa_acceleration_command() const {
+    return this->get_input_port(input_port_iiwa_acceleration_command_);
+  }
+
+  const systems::InputPortDescriptor<double>& get_input_port_wsg_command() const {
+    return this->get_input_port(input_port_wsg_command_);
+  }
+
+  const systems::OutputPort<double>& get_output_port_iiwa_status() const {
+    return this->get_output_port(output_port_iiwa_status_);
+  }
+
+  const systems::OutputPort<double>& get_output_port_wsg_status() const {
+    return this->get_output_port(output_port_wsg_status_);
+  }
+
+  const systems::OutputPort<double>& get_output_port_plant_state() const {
+    return this->get_output_port(output_port_plant_state_);
+  }
+
+  const systems::OutputPort<double>& get_output_port_targets_pose_bundle() const {
+    return this->get_output_port(output_port_targets_pose_bundle_);
+  }
+
+  const systems::OutputPort<double>& get_output_port_contact_results() const {
+    return this->get_output_port(output_port_contact_results_t_);
+  }
+
+ private:
+  std::unique_ptr<RigidBodyTree<double>> object_{nullptr};
+  systems::controllers::InverseDynamicsController<double>* iiwa_controller_{nullptr};
+  systems::controllers::PidController<double>* wsg_controller_{nullptr};
+  systems::RigidBodyPlant<double>* plant_{nullptr};
+  systems::controllers::PidController<double>* wsg_controller_{nullptr};
+  schunk_wsg::GripperCommandInterpreter<double>* gripper_command_interpreter_{nullptr};
+  schunk_wsg::GripperStatusInterpreter<double>* gripper_status_interpreter_{nullptr};
+  manipulation::util::TargetPoseBundleGenerator<double>* target_pose_bundle_generator_{nullptr};
+
+  int input_port_iiwa_state_command_{-1};
+  int input_port_iiwa_acceleration_command_{-1};
+  int input_port_wsg_command_{-1};
+  int output_port_iiwa_status_{-1};
+  int output_port_wsg_status_{-1};
+  int output_port_plant_state_{-1};
+  int output_port_targets_pose_bundle_{-1};
+  int output_port_contact_results_t_{-1};
+};
 }  // namespace kuka_iiwa_arm
 }  // namespace examples
 }  // namespace drake

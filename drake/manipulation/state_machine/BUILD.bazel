@@ -1,0 +1,34 @@
+# -*- python -*-
+# This file contains rules for Bazel; see drake/doc/bazel.rst.
+
+load(
+    "//tools:drake.bzl",
+    "drake_cc_googletest",
+    "drake_cc_library",
+)
+load("//tools/lint:lint.bzl", "add_lint_tests")
+
+package(
+    default_visibility = ["//visibility:public"],
+)
+
+drake_cc_library(
+    name = "state_machine_utils",
+    hdrs = ["state_machine_utils.h"],
+    deps = [
+        "drake/common:eigen_types",
+        "drake/systems/rendering:pose_bundle",
+    ],
+)
+
+drake_cc_library(
+    name = "manipulation_state",
+    hdrs = "manipulation_state.h",
+    deps = [
+    ],
+)
+
+drake_cc_library(
+    name = "state_machine",
+    srcs = "",
+)

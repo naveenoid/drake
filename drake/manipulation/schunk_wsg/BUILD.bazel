@@ -59,6 +59,20 @@ drake_cc_library(
     ],
 )
 
+drake_cc_library(
+    name = "schunk_wsg_command_status_interpreter",
+    srcs = [
+        "schunk_wsg_command_interpreter.cc",
+        "schunk_wsg_status_interpreter.cc",
+    ],
+    hdrs = [
+        "schunk_wsg_command_interpreter.h",
+        "schunk_wsg_status_interpreter.h",
+    ],
+    deps = [
+    ],
+)
+
 # === test/ ===
 
 drake_cc_googletest(
