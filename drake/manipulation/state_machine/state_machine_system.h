@@ -4,9 +4,10 @@
 #include <string>
 #include <vector>
 
-#include "state_machine.h"
+#include "drake/manipulation/state_machine/state_machine.h"
 #include "drake/systems/framework/leaf_system.h"
 #include "drake/systems/framework/system_symbolic_inspector.h"
+
 
 namespace drake {
 namespace manipulation {
@@ -50,16 +51,7 @@ class StateMachineSystem : public systems::LeafSystem<double> {
     return false;
   }
 
-  void CalcManipulatorPlan(
-      const systems::Context<double>& context,
-      PiecewisePolynomialTrajectory* manipulator_plan) const;
-
-  void CalcGripperPlan(
-      const systems::Context<double>& context,
-      GripperCommand* gripper_plan) const;
-
-
-  void DoCalcUnrestrictedUpate(
+  void DoCalcUnrestrictedUpdate(
       const systems::Context<double>& context,
       const std::vector<const systems::UnrestrictedUpdateEvent<double>*>&,
       systems::State<double>* state) const;
@@ -104,6 +96,14 @@ class StateMachineSystem : public systems::LeafSystem<double> {
   }
 
  private:
+  void CalcManipulatorPlan(
+      const systems::Context<double>& context,
+      PiecewisePolynomialTrajectory* manipulator_plan) const;
+
+  void CalcGripperPlan(
+      const systems::Context<double>& context,
+      GripperCommand* gripper_plan) const;
+
   struct InternalState;
 
   // Input ports.

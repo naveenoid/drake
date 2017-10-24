@@ -16,19 +16,40 @@ drake_cc_library(
     name = "state_machine_utils",
     hdrs = ["state_machine_utils.h"],
     deps = [
-        "drake/common:eigen_types",
-        "drake/systems/rendering:pose_bundle",
+        "//drake/common",
+        "//drake/systems/rendering:pose_bundle",
     ],
 )
 
 drake_cc_library(
     name = "manipulation_state",
-    hdrs = "manipulation_state.h",
+    hdrs = ["manipulation_state.h"],
     deps = [
+        ":state_machine_utils",
+        "//drake/common/trajectories:piecewise_polynomial_trajectory",
     ],
 )
 
 drake_cc_library(
     name = "state_machine",
-    srcs = "",
+    srcs = ["state_machine.cc"],
+    hdrs = ["state_machine.h"],
+    deps = [
+        ":manipulation_state",
+        ":state_machine_utils",
+        "//drake/common",
+        "//drake/common/trajectories:piecewise_polynomial_trajectory",
+    ],
+)
+
+drake_cc_library(
+    name = "state_machine_system",
+    srcs = ["state_machine_system.cc"],
+    hdrs = ["state_machine_system.h"],
+    deps = [
+        "manipulation_state",
+        ":state_machine",
+        "//drake/common/trajectories:piecewise_polynomial_trajectory",
+        "//drake/systems/framework:leaf_system",
+    ],
 )

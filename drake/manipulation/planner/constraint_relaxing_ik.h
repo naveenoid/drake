@@ -20,7 +20,7 @@ namespace planner {
  */
 class ConstraintRelaxingIk {
  public:
-  DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(ConstraintRelaxingIk);
+  //DRAKE_NO_COPY_NO_MOVE_NO_ASSIGN(ConstraintRelaxingIk);
 
   /**
    * Cartesian waypoint. Input to the IK solver.
@@ -49,6 +49,19 @@ class ConstraintRelaxingIk {
   ConstraintRelaxingIk(const std::string& model_path,
                        const std::string& end_effector_link_name,
                        const Isometry3<double>& base_to_world);
+
+  /**
+   * Constructor which accepts and externally created RigidBodyTree
+   * @param external_tree
+   */
+  ConstraintRelaxingIk(const RigidBodyTreed& external_tree,
+                       const std::string& end_effector_link_name);
+
+  std::unique_ptr<ConstraintRelaxingIk> Clone() {
+    return(
+        std::make_unique<ConstraintRelaxingIk>(
+            robot_->Clone(), end_effector_link_name_));
+  }
 
   /**
    * Sets end effector to @p end_effector_body.
@@ -88,7 +101,7 @@ class ConstraintRelaxingIk {
       const std::vector<IkCartesianWaypoint>& waypoints,
       const VectorX<double>& q_current, IKResults* ik_res);
 
- private:
+ protected:
   bool SolveIk(const IkCartesianWaypoint& waypoint, const VectorX<double>& q0,
                const VectorX<double>& q_nom,
                const Vector3<double>& pos_tol, double rot_tol,
@@ -96,10 +109,11 @@ class ConstraintRelaxingIk {
                std::vector<std::string>* infeasible_constraints);
 
   std::default_random_engine rand_generator_;
-  std::unique_ptr<RigidBodyTree<double>> robot_{nullptr};
   int end_effector_body_idx_{};
+ private:
+  std::unique_ptr<RigidBodyTree<double>> robot_{nullptr};
+  std::string end_effector_link_name_{};
 };
-
 }  // namespace planner
 }  // namespace manipulation
 }  // namespace drake

@@ -32,6 +32,14 @@ ConstraintRelaxingIk::ConstraintRelaxingIk(
   SetEndEffector(end_effector_link_name);
 }
 
+ConstraintRelaxingIk::ConstraintRelaxingIk(
+    const RigidBodyTreed& external_tree,
+    const std::string& end_effector_link_name)
+    : rand_generator_(kDefaultRandomSeed) {
+  robot_ = external_tree.Clone();
+  SetEndEffector(end_effector_link_name);
+}
+
 bool ConstraintRelaxingIk::PlanSequentialTrajectory(
     const std::vector<IkCartesianWaypoint>& waypoints,
     const VectorX<double>& q_current, IKResults* ik_res) {
