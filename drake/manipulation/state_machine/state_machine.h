@@ -1,7 +1,8 @@
 #pragma once
 
 #include <memory>
-#include <vector>
+#include <string>
+#include <map>
 
 #include "drake/common/eigen_types.h"
 #include "drake/manipulation/state_machine/state_machine_utils.h"
@@ -28,11 +29,13 @@ class StateMachine {
   virtual std::unique_ptr<StateMachine> Clone() const = 0;
 
   virtual ManipulationState* ComputeStateTransition(
-      const ManipulationWorldStatus& manipulation_world_status) = 0;
+      const ManipulationWorldStatus& manipulation_world_status,
+      double current_time) = 0;
 
   virtual ~StateMachine() = 0;
  protected:
-  std::vector<copyable_unique_ptr<ManipulationState>> state_list;
+  std::map<std::string, copyable_unique_ptr<ManipulationState>>
+      state_name_map;
   ManipulationState* current_state_{nullptr};
   int current_state_id_{-1};
 };

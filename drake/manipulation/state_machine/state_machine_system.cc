@@ -90,8 +90,7 @@ void StateMachineSystem::DoCalcUnrestrictedUpdate(
   ManipulationState* next_state = internal_state.state_machine_->ComputeStateTransition(
       internal_state.world_status_);
 
-
-  next_state->Execute(internal_state.world_status_, &internal_state.world_command_);
+  next_state->Execute(internal_state.world_status_, context.get_time(), &internal_state.world_command_);
 
   if(internal_state.world_command_.is_new_manipulator_plan_) {
     internal_state.world_command_.manipulator_plan_.shiftRight(context.get_time());

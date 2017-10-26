@@ -9,6 +9,7 @@
 #include "drake/common/eigen_types.h"
 #include "drake/common/trajectories/piecewise_polynomial_trajectory.h"
 #include "drake/multibody/rigid_body_ik.h"
+#include "drake/common/copyable_unique_ptr.h"
 
 namespace drake {
 namespace manipulation {
@@ -60,7 +61,7 @@ class ConstraintRelaxingIk {
   std::unique_ptr<ConstraintRelaxingIk> Clone() {
     return(
         std::make_unique<ConstraintRelaxingIk>(
-            robot_->Clone(), end_effector_link_name_));
+            *(robot_->Clone().get()), end_effector_link_name_));
   }
 
   /**
@@ -111,7 +112,7 @@ class ConstraintRelaxingIk {
   std::default_random_engine rand_generator_;
   int end_effector_body_idx_{};
  private:
-  std::unique_ptr<RigidBodyTree<double>> robot_{nullptr};
+  copyable_unique_ptr<RigidBodyTree<double>> robot_{nullptr};
   std::string end_effector_link_name_{};
 };
 }  // namespace planner

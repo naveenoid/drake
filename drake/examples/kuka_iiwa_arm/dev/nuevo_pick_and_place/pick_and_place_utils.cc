@@ -4,12 +4,14 @@
 #include "drake/common/text_logging.h"
 #include "drake/common/trajectories/piecewise_quaternion.h"
 #include "drake/math/rotation_matrix.h"
-
+#include "drake/examples/kuka_iiwa_arm/iiwa_common.h"
 
 namespace drake {
 namespace examples {
 namespace kuka_iiwa_arm {
 namespace pick_and_place {
+
+
 
 using manipulation::planner::ConstraintRelaxingIk;
 
@@ -38,10 +40,9 @@ bool PlanStraightLineMotion(const VectorX<double>& q_current,
                             const int num_via_points, double duration,
                             const Isometry3<double>& X_WEndEffector0,
                             const Isometry3<double>& X_WEndEffector1,
-                            const Vector3<double>& via_points_pos_tolerance,
-                            const double via_points_rot_tolerance,
-                            ConstraintRelaxingIk* planner, IKResults* ik_res,
-                            std::vector<double>* times) {
+                            ConstraintRelaxingIk* planner,
+                            const ConstraintRelaxingIkTolerances& tolerances,
+                            PiecewisePolynomialTrajectory* trajectory) {
   DRAKE_DEMAND(duration > 0 && num_via_points >= 0);
   // Makes a slerp trajectory from start to end.
   const eigen_aligned_std_vector<Quaternion<double>> quats = {
@@ -59,15 +60,17 @@ bool PlanStraightLineMotion(const VectorX<double>& q_current,
   PiecewisePolynomial<double> pos_traj =
       PiecewisePolynomial<double>::FirstOrderHold({0, duration}, pos);
 
+  std::vector<double> times;
+  IKResults ik_res;
   std::vector<
       ConstraintRelaxingIk::IkCartesianWaypoint> waypoints(num_via_points + 1);
   const double dt = duration / (num_via_points + 1);
   double time = 0;
-  times->clear();
-  times->push_back(time);
+  times.clear();
+  times.push_back(time);
   for (int i = 0; i <= num_via_points; ++i) {
     time += dt;
-    times->push_back(time);
+    times.push_back(time);
     waypoints[i].pose.translation() = pos_traj.value(time);
     waypoints[i].pose.linear() = Matrix3<double>(rot_traj.orientation(time));
     drake::log()->debug(
@@ -75,19 +78,38 @@ bool PlanStraightLineMotion(const VectorX<double>& q_current,
         waypoints[i].pose.translation().transpose(),
         math::rotmat2rpy(waypoints[i].pose.linear()).transpose());
     if (i != num_via_points) {
-      waypoints[i].pos_tol = via_points_pos_tolerance;
-      waypoints[i].rot_tol = via_points_rot_tolerance;
+      waypoints[i].pos_tol = tolerances.via_points_pos_tolerance;
+      waypoints[i].rot_tol = tolerances.via_points_rot_tolerance;
     }
     waypoints[i].constrain_orientation = true;
   }
-  DRAKE_DEMAND(times->size() == waypoints.size() + 1);
+  DRAKE_DEMAND(times.size() == waypoints.size() + 1);
+
   const bool planner_result =
-      planner->PlanSequentialTrajectory(waypoints, q_current, ik_res);
+      planner->PlanSequentialTrajectory(waypoints, q_current, &ik_res);
   drake::log()->debug("q initial: {}", q_current.transpose());
-  if (!ik_res->q_sol.empty()) {
-    drake::log()->debug("q final: {}", ik_res->q_sol.back().transpose());
+  if (!ik_res.q_sol.empty()) {
+    drake::log()->debug("q final: {}", ik_res.q_sol.back().transpose());
   }
   drake::log()->debug("result: {}", planner_result);
+
+  ////// Creates the PiecewisePolynomialTrajectory.
+
+  std::vector<int> info(times.size(), 1);
+  MatrixX<double> q_mat(ik_res.q_sol.front().size(), q_current.size());
+  for (size_t i = 0; i < q_current.size(); ++i) q_mat.col(i) = q_current[i];
+  ApplyJointVelocityLimits(1.0 /* kMaxIiwaJointVelocity (rad/sec) */,
+                           q_mat, &times);
+
+  std::vector<Eigen::MatrixXd> knots(times.size());
+  for(int i; i < times.size(); ++i ) {
+    knots[i] = q_mat.col(i);
+  }
+
+  PiecewisePolynomial<double> pp = PiecewisePolynomial<double>::Cubic(
+      times, knots, Eigen::MatrixXd::Zero(q_mat.rows(), 1),
+      Eigen::MatrixXd::Zero(q_mat.rows(), 1));
+
   return planner_result;
 }
 

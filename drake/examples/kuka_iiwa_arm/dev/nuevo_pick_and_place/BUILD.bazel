@@ -7,13 +7,13 @@ load(
     "drake_cc_library",
 )
 load("//tools/lint:lint.bzl", "add_lint_tests")
-load(":pick_and_place_test.bzl", "pick_and_place_test")
 
 drake_cc_library(
     name = "pick_and_place_states",
     srcs = ["pick_and_place_states.cc"],
     hdrs = ["pick_and_place_states.h"],
     deps = [
+        "//drake/common:copyable_unique_ptr",
         "//drake/manipulation/planner:constraint_relaxing_ik",
         "//drake/manipulation/state_machine:manipulation_state",
         "//drake/manipulation/state_machine:state_machine_utils",

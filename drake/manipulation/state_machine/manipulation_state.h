@@ -23,12 +23,15 @@ class ManipulationState {
 
   virtual void Execute(
       const ManipulationWorldStatus& manipulation_world_status,
+      double current_time,
       ManipulationWorldCommand* manipulation_world_command) = 0;
 
-  bool IsActive() { return is_active_; }
+  virtual bool HasCompleted(
+      const ManipulationWorldStatus &manipulation_world_status,
+      double current_time) = 0;
 
  protected:
-  bool is_active_{false};
+  bool has_completed_{false};
 
 };
 

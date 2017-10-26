@@ -16,6 +16,7 @@ drake_cc_library(
     srcs = ["constraint_relaxing_ik.cc"],
     hdrs = ["constraint_relaxing_ik.h"],
     deps = [
+        "//drake/common:copyable_unique_ptr",
         "//drake/common/trajectories:piecewise_polynomial_trajectory",
         "//drake/multibody:inverse_kinematics",
         "//drake/multibody:rigid_body_tree",
