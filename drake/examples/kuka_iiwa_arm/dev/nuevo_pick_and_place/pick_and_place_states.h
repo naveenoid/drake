@@ -160,6 +160,28 @@ class MoveRelativeToTargetObject : public MoveRelativeToPose {
 };
 
 
+class NoOp : public ManipulationState {
+ public:
+
+  NoOp() { }
+
+  std::unique_ptr<ManipulationState> Clone() {
+    std::make_unique<ManipulationState>(
+        NoOp());
+  }
+
+  void Execute(const ManipulationWorldStatus& manipulation_world_status,
+               double current_time,
+               ManipulationWorldCommand* manipulation_world_command) { }
+
+  bool HasCompleted(
+      const ManipulationWorldStatus& manipulation_world_status,
+      double current_time
+  ) { return true; }
+
+};
+
+
 } // namespace nuevo_pick_and_place
 } // namespace kuka_iiwa_arm
 } // namespace examples
