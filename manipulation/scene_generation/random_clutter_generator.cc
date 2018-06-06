@@ -73,6 +73,16 @@ void AppendTo(T* t, const T& t_to_append) {
   t->tail(append_size) = t_to_append;
 }
 
+Eigen::VectorXd CumSum(double min, double max, int num_elements) {
+  Eigen::VectorXd cumsum = Eigen::VectorXd::Zero();
+  double diff = 0.0;
+  for (auto &i : cumsum) {
+    i = dif;
+    dif += (max - min)/num_elements;
+  }
+
+}
+
 } // namespace
 
 void PopulateWithFloatingObjectRepetitions(
@@ -166,46 +176,44 @@ VectorX<double> RandomClutterGenerator::GetRandomBoundedConfiguration(
   return q_random;
 }
 
-VectorX<double> RandomClutterGenerator::GetNominalConfiguration(
-    const RigidBodyTreed& model_tree) {
-  VectorX<double> q_zero =
-      VectorX<double>::Zero(model_tree.get_num_positions());
+// VectorX<double> RandomClutterGenerator::GetNominalConfiguration(
+//     const RigidBodyTreed& model_tree) {
+//   VectorX<double> q_zero =
+//       VectorX<double>::Zero(model_tree.get_num_positions());
 
-  int num_model_instances = model_tree.get_num_model_instances();
-  VectorX<double> x = VectorX<double>::Zero(model_tree.get_num_positions());
+//   int num_model_instances = model_tree.get_num_model_instances();
+//   VectorX<double> x = VectorX<double>::Zero(model_tree.get_num_positions());
 
-  // iterate through tree. Set random poses for each floating element.
-  for (int i = 0; i < num_model_instances; ++i) {
-    auto base_body_index = model_tree.FindBaseBodies(i);
-    // TODO(naveenoid) : figure out if the model instance has more than 1 link
+//   // iterate through tree. Set random poses for each floating element.
+//   for (int i = 0; i < num_model_instances; ++i) {
+//     auto base_body_index = model_tree.FindBaseBodies(i);
+//     // TODO(naveenoid) : figure out if the model instance has more than 1 link
 
-    std::vector<const RigidBody<double>*> model_instance_bodies =
-        model_tree.FindModelInstanceBodies(i);
+//     std::vector<const RigidBody<double>*> model_instance_bodies =
+//         model_tree.FindModelInstanceBodies(i);
 
-    Isometry3d segment_pose = Isometry3d::Identity();
-    q_zero.segment<7>(model_instance_bodies[0]->get_position_start_index()) =
-        Isometry3dToVector(segment_pose);
-  }
-  return q_zero;
-}
+//     Isometry3d segment_pose = Isometry3d::Identity();
+//     q_zero.segment<7>(model_instance_bodies[0]->get_position_start_index()) =
+//         Isometry3dToVector(segment_pose);
+//   }
+//   return q_zero;
+// }
 
 VectorX<double> RandomClutterGenerator::Generate(
   const VectorX<double> q_initial) {
   
-  VectorX<double> q_ini = 
+  VectorX<double> q_nominal = 
    GetRandomBoundedConfiguration(q_initial);
   
   if (visualize_steps_) {
-    SimpleTreeVisualizer visualizer(*scene_tree_.get(), lcm_);
+    SimpleTreeVisualizer visualizer(*scene_tree_, lcm_);
   }
   VectorX<double> q_ik_result = q_initial;
 
-  if (with_ik_) {
-    int ik_result_code = 100;
-    while(ik_result_code!= 1) {
-      VectorX<double> q_nominal = GetNominalConfiguration(*models_tree.get());
-      // setup constraint array.
-      std::vector<RigidBodyConstraint*> constraint_array;
+   int ik_result_code = 100;
+   while(ik_result_code!= 1) {
+     // setup constraint array.
+     std::vector<RigidBodyConstraint*> constraint_array;
 
       // set MinDistanceConstraint
       std::vector<int> active_bodies_idx;
@@ -239,14 +247,85 @@ VectorX<double> RandomClutterGenerator::Generate(
       int floating_body_index = 0;
       int num_floating_bodies = 0;
 
-      for (int i = 0; i < models_tree->get_num_bodies(); ++i) {
-        // set WorldPositionConstraint (bounds every object to the bounding box)
-        auto world_position_constraint =
-                std::make_unique<WorldPositionConstraint>(
-                        models_tree.get(), i, Eigen::Vector3d::Zero(), lb, ub);
-        constraint_array.push_back(world_position_constraint.get());
 
-        if (i > 1) {
+// for (int i = 0; i < models_tree->get_num_bodies(); ++i) {
+//         // set WorldPositionConstraint (bounds every object to the bounding box)
+//         auto world_position_constraint =
+//                 std::make_unique<WorldPositionConstraint>(
+//                         models_tree.get(), i, Eigen::Vector3d::Zero(), lb, ub);
+//         constraint_array.push_back(world_position_constraint.get());
+
+//         if (i > 1) {
+//           if (models_tree->get_body(i).getJoint().is_floating()) {
+//             int start_index = models_tree->get_body(i).get_position_start_index();
+//             AppendTo<Eigen::VectorXi>(
+//                     &jAvar,
+//                     (Eigen::VectorXi(4) << start_index + 3, start_index + 4,
+//                             start_index + 5, start_index + 6)
+//                             .finished());
+//             AppendTo<Eigen::VectorXi>(
+//                     &iAfun,
+//                     (Eigen::VectorXi(4) << floating_body_index++,
+//                             floating_body_index++, floating_body_index++,
+//                             floating_body_index++)
+//                             .finished());
+
+//             ++num_floating_bodies;
+
+//             AppendTo<Eigen::VectorXd>(
+//                     &orientation_lb,
+//                     (VectorX<double>(4) << unit_quat.w(), unit_quat.x(),
+//                             unit_quat.y(), unit_quat.z())
+//                             .finished());
+//           }
+//         }
+//       }
+//       orientation_ub = orientation_lb;
+
+//       A = VectorX<double>::Ones(iAfun.size());
+
+//       // Adding a single linear constraint for setting all orientations to their
+//       // (initial) random orientations. This is needed to ensure that feasible 
+//       // orientations are generated as a result of the IK.
+//       auto linear_orientation_constraint =
+//               std::make_unique<SingleTimeLinearPostureConstraint>(
+//                       models_tree.get(), iAfun, jAvar, A, orientation_lb, orientation_ub);
+
+//       constraint_array.push_back(linear_orientation_constraint.get());
+
+
+
+
+      for (int i = 0; i < models_tree->get_num_model_instances(); ++i) {
+        // set WorldPositionConstraint (bounds every object to the bounding box)
+        if(clutter_model_instances_->count(i) == 0) {
+          // The current model instance was not one of the clutter model instances.
+            auto model_instance_bodies = model_tree.FindModelInstanceBodies(i);
+
+            // Check if single or multi-body
+            // if floating base, constraint all base dofs.
+            // if fixed base, check if bodies are floating?
+
+            int index = model_instance_bodies[0]->get_position_start_index()
+            AppendTo<Eigen::VectorXi>(
+                    &jAvar,
+                    (Eigen::VectorXi(4) << start_index + 3, start_index + 4,
+                            start_index + 5, start_index + 6)
+                            .finished());
+            AppendTo<Eigen::VectorXi>(
+                    &iAfun,
+                    (Eigen::VectorXi(4) << floating_body_index++,
+                            floating_body_index++, floating_body_index++,
+                            floating_body_index++)
+                            .finished());
+
+        } else {
+          auto world_position_constraint =
+                  std::make_unique<WorldPositionConstraint>(
+                          models_tree.get(), i, Eigen::Vector3d::Zero(), lb, ub);
+          constraint_array.push_back(world_position_constraint.get());  
+
+          if (i > 1) {
           if (models_tree->get_body(i).getJoint().is_floating()) {
             int start_index = models_tree->get_body(i).get_position_start_index();
             AppendTo<Eigen::VectorXi>(
@@ -270,20 +349,28 @@ VectorX<double> RandomClutterGenerator::Generate(
                             .finished());
           }
         }
+
+        
+
+        
+        }
       }
       orientation_ub = orientation_lb;
 
       A = VectorX<double>::Ones(iAfun.size());
 
       // Adding a single linear constraint for setting all orientations to their
-      // (initial) random orientations.
+      // (initial) random orientations. This is needed to ensure that feasible 
+      // orientations are generated as a result of the IK.
       auto linear_orientation_constraint =
               std::make_unique<SingleTimeLinearPostureConstraint>(
                       models_tree.get(), iAfun, jAvar, A, orientation_lb, orientation_ub);
 
       constraint_array.push_back(linear_orientation_constraint.get());
 
-      drake::log()->info("Constraint array size {}", constraint_array.size());
+
+
+     drake::log()->info("Constraint array size {}", constraint_array.size());
 
       IKoptions ikoptions(models_tree.get());
       ikoptions.setDebug(true);
