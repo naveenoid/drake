@@ -53,7 +53,7 @@ class RandomClutterGenerator {
    */
   RandomClutterGenerator(
       const RigidBodyTreed& scene_tree, 
-      Eigen::Isometry3<double> X_WB,
+      Vector3<double> bounding_box_centroid,
       Vector3<double> bounding_box_size, 
       std::vector<int> clutter_model_instances,
       double min_inter_object_distance = 0.001);
@@ -77,6 +77,7 @@ class RandomClutterGenerator {
       const VectorX<double>& q_ik);
 
   const RigidBodyTreed scene_tree_;
+  int state_dimension_;
   Isometry3<double> X_WB_{
     Isometry3<double>::Identity();}
   Vector3<double> bounding_box_size_{

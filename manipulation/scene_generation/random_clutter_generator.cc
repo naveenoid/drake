@@ -73,14 +73,13 @@ void AppendTo(T* t, const T& t_to_append) {
   t->tail(append_size) = t_to_append;
 }
 
-Eigen::VectorXd CumSum(double min, double max, int num_elements) {
-  Eigen::VectorXd cumsum = Eigen::VectorXd::Zero();
-  double diff = 0.0;
-  for (auto &i : cumsum) {
-    i = dif;
-    dif += (max - min)/num_elements;
+Eigen::VectorXi SimpleCumulativeSum(int num_elements) {
+  Eigen::VectorXi cumsum = Eigen::VectorXi::Zero();
+  int i=0;
+  for (auto &it : cumsum) {
+    it = i++;
   }
-
+  return cumsum;
 }
 
 } // namespace
@@ -116,7 +115,8 @@ RandomClutterGenerator::RandomClutterGenerator(
 scene_tree_(scene_tree), 
 bounding_box_pose_(bounding_box), 
 bounding_box_size_(bounding_box_size_), 
-clutter_model_instances_(clutter_model_instances) {
+clutter_model_instances_(clutter_model_instances), 
+state_dimension_(scene_tree_.get_num_positions()) {
   // Checks that the number of requested instances > 0 & < the total number
   // of instances in the tree.
   DRAKE_DEMAND(clutter_model_instances.size() > 0);
@@ -211,7 +211,7 @@ VectorX<double> RandomClutterGenerator::Generate(
   VectorX<double> q_ik_result = q_initial;
 
    int ik_result_code = 100;
-   while(ik_result_code!= 1) {
+   //while(ik_result_code!= 1) {
      // setup constraint array.
      std::vector<RigidBodyConstraint*> constraint_array;
 
@@ -240,13 +240,17 @@ VectorX<double> RandomClutterGenerator::Generate(
         ub = (VectorX<double>(3) << inf, inf, inf).finished();
       }
 
+/*
       Eigen::VectorXi iAfun, jAvar;
       VectorX<double> A, orientation_lb, orientation_ub;
+
+
       Quaterniond unit_quat = Quaterniond::UnitRandom();
 
       int floating_body_index = 0;
       int num_floating_bodies = 0;
 
+*/
 
 // for (int i = 0; i < models_tree->get_num_bodies(); ++i) {
 //         // set WorldPositionConstraint (bounds every object to the bounding box)
@@ -294,11 +298,11 @@ VectorX<double> RandomClutterGenerator::Generate(
 //       constraint_array.push_back(linear_orientation_constraint.get());
 
 
+      Eigen::VectorXi iAfun = Eigen::VectorXi::Ones(), jAvar;
+      VectorX<double> A = VectorX<double>::Ones(q_nominal.size()), 
+      lb = q_nominal, ub = q_nominal;
 
-
-      for (int i = 0; i < models_tree->get_num_model_instances(); ++i) {
-        // set WorldPositionConstraint (bounds every object to the bounding box)
-        if(clutter_model_instances_->count(i) == 0) {
+      for (auto& it : clutter_model_instances_) {
           // The current model instance was not one of the clutter model instances.
             auto model_instance_bodies = model_tree.FindModelInstanceBodies(i);
 
