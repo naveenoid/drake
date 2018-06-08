@@ -22,20 +22,21 @@ drake_cc_library(
     ],
  )
 
-# drake_cc_binary(
-#     name = "random_clutter_demo",
-#     srcs = ["random_clutter_demo.cc"],
-#     data = [
-#         "//drake/examples/kuka_iiwa_arm:models",
-#         "//drake/examples/kuka_iiwa_arm:prod_models",
-#     ],
-#     deps = [
-#         ":random_clutter_generator",
-#         "//drake/common",
-#         "//drake/common:text_logging_gflags",
-#         "@com_github_gflags_gflags//:gflags",
-#     ],
-# )
+drake_cc_binary(
+    name = "random_clutter_demo",
+    srcs = ["random_clutter_demo.cc"],
+    data = [
+        "//examples/kuka_iiwa_arm:models",
+        "//examples/kuka_iiwa_arm:prod_models",
+        "//manipulation/models/jaco_description:models",
+    ],
+    deps = [
+        ":random_clutter_generator",
+        "//common",
+        "//common:text_logging_gflags",
+        "@gflags",
+    ],
+)
 
 # add_lint_tests()
 
