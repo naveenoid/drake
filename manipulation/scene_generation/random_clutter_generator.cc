@@ -342,6 +342,7 @@ VectorX<double> RandomClutterGenerator::Generate(
     drake::log()->info("Constraint array size {}", constraint_array.size());
 
     IKoptions ikoptions(scene_tree_ptr_);
+    ikoptions.setQ(Eigen::MatrixXd::Zero(q_initial.size(), q_initial.size()));
     ikoptions.setDebug(true);
 
     // setup IK problem and run.
@@ -372,36 +373,56 @@ VectorX<double> RandomClutterGenerator::Generate(
 VectorX<double> RandomClutterGenerator::DropObjectsToGround(
     const VectorX<double>& q_ik) {
   Simulator<double> simulator(*fall_sim_diagram_);
+  int num_positions = scene_tree_ptr_->get_num_positions();
+  int num_velocities = scene_tree_ptr_->get_num_velocities();
 
   // setting initial condition
   // auto diagram_context = sys->CreateDefaultContext();
   VectorX<double> x_initial =
-      VectorX<double>::Zero(scene_tree_ptr_->get_num_positions() +
-                            scene_tree_ptr_->get_num_velocities());
+      VectorX<double>::Zero(num_positions + num_velocities);
 
   x_initial.head(scene_tree_ptr_->get_num_positions()) = q_ik;
-  simulator.get_mutable_context()
+  
+
+simulator.get_mutable_context()
       .get_mutable_continuous_state_vector()
       .SetFromVector(x_initial);
-
   simulator.Initialize();
 
-  if (visualize_steps_) {
-    // simulator.set_target_realtime_rate(1.0);
-  }
   simulator.reset_integrator<RungeKutta2Integrator<double>>(
       *fall_sim_diagram_, 0.0001, &simulator.get_mutable_context());
   simulator.get_mutable_integrator()->set_maximum_step_size(0.001);
   simulator.get_mutable_integrator()->set_fixed_step_mode(true);
 
-  drake::log()->info("Starting Simulation");
-  simulator.StepTo(1.1);
 
+  VectorX<double> v =  VectorX<double>::Zero(
+                        num_velocities);
+
+
+  double step_time = 0.1, step_delta = 0.01;
+  double v_threshold = 1e-3;
+  VectorX<double> x = x_initial;
+  do{
+    drake::log()->info("Starting Simulation");
+    
+  //drake::log()->info("v_before {}", v.transpose());
+  drake::log()->info("v_norm before {}", v.norm());
+
+    simulator.StepTo(step_time);
+
+    step_time+=step_delta;
+
+    x = 
+    simulator.get_context().get_continuous_state_vector().CopyToVector();
+
+  drake::log()->info("v_after {}", v.transpose());
+    v = x.tail(num_velocities);
+    //drake::log()->info("v_before {}", v.transpose());
+  drake::log()->info("v_norm After {}", v.norm());
+  } while((v.array() > v_threshold).all());
+  
   drake::log()->info("Copying the return vector");
-  VectorX<double> q_return =
-      simulator.get_context().get_continuous_state_vector().CopyToVector();
-
-  return q_return;
+    return x.head(num_positions);
 }
 
 std::unique_ptr<systems::Diagram<double>>

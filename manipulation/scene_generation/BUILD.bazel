@@ -27,6 +27,7 @@ drake_cc_binary(
     srcs = ["random_clutter_demo.cc"],
     data = [
         "//examples/kuka_iiwa_arm:models",
+        "//examples/double_pendulum:models",
         "//examples/kuka_iiwa_arm:prod_models",
         "//manipulation/models/jaco_description:models",
     ],

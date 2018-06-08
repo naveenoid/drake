@@ -23,9 +23,12 @@ using std::stringstream;
 using std::map;
 
 DEFINE_int32(model_reps, 1, "each of 4 models is repeated this many times");
+DEFINE_int32(jaco_reps, 1, "each of jaco models is repeated this many times");
+DEFINE_int32(pendulum_reps, 1, "each of pendulum models is repeated this many times");
 
 const string kPath = "examples/kuka_iiwa_arm/models/objects/";
 const string jacoPath = "manipulation/models/jaco_description/urdf/";
+const string pendulumPath = "examples/double_pendulum/models/";
 
 std::vector<int> PopulateWithFloatingObjectRepetitions(
     util::WorldSimTreeBuilder<double>* tree_builder,
@@ -57,7 +60,8 @@ std::unique_ptr<RigidBodyTreed> GenerateSceneTree(
       {kPath + "block_for_pick_and_place_large_size.urdf", FLAGS_model_reps},
       {kPath + "big_robot_toy.urdf", FLAGS_model_reps},
       {kPath + "block_for_pick_and_place_mid_size.urdf", FLAGS_model_reps}, 
-      {jacoPath + "j2s7s300.urdf", 0}};
+      {jacoPath + "j2s7s300.urdf", FLAGS_jaco_reps},
+      {pendulumPath + "double_pendulum.sdf", FLAGS_pendulum_reps}};
 
   std::unique_ptr<util::WorldSimTreeBuilder<double>> tree_builder =
       std::make_unique<util::WorldSimTreeBuilder<double>>();
@@ -93,7 +97,7 @@ int DoMain() {
 
   RandomClutterGenerator clutter(std::move(scene_tree), clutter_instances,
                                  Vector3<double>(0.0, 0.0, 0.65),
-                                 Vector3<double>(0.25, 0.45, 2.0), true);
+                                 Vector3<double>(0.25, 0.45, 3.0), true);
 
   std::default_random_engine generator(123);
 
