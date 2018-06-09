@@ -43,33 +43,6 @@ using systems::ContinuousState;
 using util::ModelInstanceInfo;
 
 namespace {
-// VectorX<double> Isometry3dToVector(const Isometry3d& pose) {
-//   VectorXd return_vector = VectorXd::Zero(7);
-//   return_vector.head(3) = pose.translation();
-//   Quaterniond return_quat = Quaterniond(pose.linear());
-//   return_vector.tail(4) = (VectorXd(4) << return_quat.w(), return_quat.x(),
-//                            return_quat.y(), return_quat.z())
-//                               .finished();
-//   return return_vector;
-// }
-
-// Isometry3<double> VectorToIsometry3d(const VectorX<double>& q) {
-//   Isometry3<double> return_pose = Isometry3<double>::Identity();
-//   return_pose.translation() = q.head(3);
-//   Quaterniond return_quat = Quaterniond(q(3), q(4), q(5), q(6));
-//   return_pose.linear() = return_quat.toRotationMatrix();
-//   return return_pose;
-// }
-
-// template <typename T>
-// void AppendTo(T* t, const T& t_to_append) {
-//   int append_size = t_to_append.size();
-//   T t_copy = *t;
-//   int old_size = t->size();
-//   t->resize(old_size + append_size);
-//   t->head(old_size) = t_copy;
-//   t->tail(append_size) = t_to_append;
-// }
 
 Eigen::VectorXi SimpleCumulativeSum(int num_elements) {
   Eigen::VectorXi cumsum = Eigen::VectorXi::Constant(num_elements, 0);
@@ -82,23 +55,30 @@ Eigen::VectorXi SimpleCumulativeSum(int num_elements) {
 
 }  // namespace
 
-// const double kRandomInitializationDimensionRatio = 0.7;
+void VisualizeSimulationLcm(lcm::DrakeLcm* lcm,
+                            systems::DiagramBuilder<double>* builder,
+                            systems::RigidBodyPlant<double>* plant) {
+  auto drake_visualizer = builder->template AddSystem<systems::DrakeVisualizer>(
+      plant->get_rigid_body_tree(), lcm);
+  drake_visualizer->set_name("DV");
+
+  builder->Connect(plant->get_output_port(0),
+                   drake_visualizer->get_input_port(0));
+}
 
 RandomClutterGenerator::RandomClutterGenerator(
     std::unique_ptr<RigidBodyTreed> scene_tree,
     std::vector<int> clutter_model_instances, Vector3<double> clutter_center,
-    Vector3<double> clutter_size, bool visualize_steps,
+    Vector3<double> clutter_size, const VisualizeSimulationCallback& visualize,
     double min_inter_object_distance)
     : scene_tree_ptr_(scene_tree.get()),
       clutter_model_instances_(clutter_model_instances),
       clutter_center_(clutter_center),
       clutter_lb_(-0.5 * clutter_size),
       clutter_ub_(0.5 * clutter_size),
-      visualize_steps_(visualize_steps),
       inter_object_distance_(min_inter_object_distance) {
   // Checks that the number of requested instances > 0 & < the total number
   // of instances in the tree.
-
   DRAKE_DEMAND(clutter_model_instances.size() >= 1);
   for (auto& it : clutter_model_instances) {
     // check that the tree contains the model instance in question. i.e
@@ -106,122 +86,26 @@ RandomClutterGenerator::RandomClutterGenerator(
     // clutter_model_instance.
     DRAKE_DEMAND(scene_tree->FindModelInstanceBodies(it).size() > 0);
   }
-
-  fall_sim_diagram_ = GenerateFallSimDiagram(std::move(scene_tree));
-
-  // distribution_map_["length"] =
-  //     normal_distribution<double>(-clutter_size_[0] / 2, +clutter_size_[0] /
-  //     2);
-  // distribution_map_["breadth"] =
-  //     normal_distribution<double>(-clutter_size_[1] / 2, +clutter_size_[1] /
-  //     2);
-  // distribution_map_["height"] =
-  //     normal_distribution<double>(-clutter_size_[2] / 2, +clutter_size_[2] /
-  //     2);
-  // distribution_map_["orientation"] = normal_distribution<double>();
+  fall_sim_diagram_ = GenerateFallSimDiagram(std::move(scene_tree), visualize);
 }
 
-// Isometry3<double> RandomClutterGenerator::GenerateRandomBoundedPose() {
-//   Quaterniond random_quat = Quaterniond::UnitRandom();
-//   Isometry3d return_pose = Isometry3d::Identity();
-//   return_pose.linear() = random_quat.toRotationMatrix();
-
-//   uniform_real_distribution<double> x_distribution(
-//       -clutter_size_(0) * (kRandomInitializationDimensionRatio / 2),
-//       clutter_size_(0) * (kRandomInitializationDimensionRatio / 2));
-
-//   uniform_real_distribution<double> y_distribution(
-//       -clutter_size_(1) * (kRandomInitializationDimensionRatio / 2),
-//       clutter_size_(1) * (kRandomInitializationDimensionRatio / 2));
-
-//   uniform_real_distribution<double> z_distribution(
-//       -clutter_size_(2) * (kRandomInitializationDimensionRatio / 2),
-//       clutter_size_(2) * (kRandomInitializationDimensionRatio / 2));
-
-//   return_pose.translation() =
-//       (VectorXd(3) << x_distribution(generator_), y_distribution(generator_),
-//        z_distribution(generator_))
-//           .finished();
-//   return_pose.makeAffine();
-
-//   Eigen::Isometry3d X_WB = Eigen::Isometry3d::Identity();
-//   X_WB.translation() = clutter_center_;
-//   // return pose is computed in the Bounding box frame B. Transform and
-//   return
-//   // pose in World frame (W).
-//   return X_WB * return_pose;
-// }
-
-// VectorX<double> RandomClutterGenerator::GetRandomBoundedConfiguration(
-//     const RigidBodyTree<double>* scene_tree,
-//     std::vector<int> clutter_model_instances, const VectorX<double> q_inital)
-//     {
-//   VectorX<double> q_random = q_inital;
-
-//   VectorX<double> x = VectorX<double>::Zero(scene_tree->get_num_positions());
-
-//   // iterate through clutter elements in the tree. Set random poses for each
-//   // element.
-//   for (auto it : clutter_model_instances) {
-//     auto base_body_index = scene_tree->FindBaseBodies(it);
-
-//     // TODO(naveenoid) : resolve multi-link model initialization.
-//     std::vector<const RigidBody<double>*> model_instance_bodies =
-//         scene_tree->FindModelInstanceBodies(it);
-//     Isometry3d segment_pose = GenerateRandomBoundedPose();
-//     q_random.segment<7>(model_instance_bodies[0]->get_position_start_index())
-//     =
-//         Isometry3dToVector(segment_pose);
-//   }
-//   return q_random;
-// }
-
-// VectorX<double> RandomClutterGenerator::GetNominalConfiguration(
-//     const RigidBodyTreed& model_tree) {
-//   VectorX<double> q_zero =
-//       VectorX<double>::Zero(model_tree.get_num_positions());
-
-//   int num_model_instances = model_tree.get_num_model_instances();
-//   VectorX<double> x = VectorX<double>::Zero(model_tree.get_num_positions());
-
-//   // iterate through tree. Set random poses for each floating element.
-//   for (int i = 0; i < num_model_instances; ++i) {
-//     auto base_body_index = model_tree.FindBaseBodies(i);
-//     // TODO(naveenoid) : figure out if the model instance has more than 1
-//     link
-//     std::vector<const RigidBody<double>*> model_instance_bodies =
-//         model_tree.FindModelInstanceBodies(i);\
-//     Isometry3d segment_pose = Isometry3d::Identity();
-//     q_zero.segment<7>(model_instance_bodies[0]->get_position_start_index()) =
-//         Isometry3dToVector(segment_pose);
-//   }
-//   return q_zero;
-// }
-
-VectorX<double> RandomClutterGenerator::Generate(
+VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
     const VectorX<double> q_nominal, std::default_random_engine& generator) {
   DRAKE_DEMAND(scene_tree_ptr_->get_num_positions() == q_nominal.size());
-  /*
-    if (visualize_steps_) {
-      SimpleTreeVisualizer visualizer(*scene_tree.get(), lcm_);
-    }*/
+
   VectorX<double> q_ik_result = q_nominal;
 
   int ik_result_code = 100;
-
   // Keep running the IK until a feasible solution is found.
   while (ik_result_code != 1) {
-    drake::log()->info("IK new run initiated on tree of size {}.", 
-      scene_tree_ptr_->get_num_positions());
-
-    // VectorX<double> q_nominal = GetRandomBoundedConfiguration(
-    //     scene_tree.get(), clutter_model_instances, q_initial);
+    drake::log()->debug("IK new run initiated on tree of size {}.",
+                        scene_tree_ptr_->get_num_positions());
 
     // Setup constraint array.
     std::vector<RigidBodyConstraint*> constraint_array;
 
     // set MinDistanceConstraint
-    drake::log()->info("MinDistanceConstraint added.");
+    drake::log()->debug("Adding MinDistanceConstraint.");
     std::vector<int> active_bodies_idx;
     std::set<std::string> active_group_names;
     MinDistanceConstraint min_distance_constraint(
@@ -235,40 +119,30 @@ VectorX<double> RandomClutterGenerator::Generate(
     VectorX<double> linear_posture_A = VectorX<double>::Ones(q_nominal.size()),
                     linear_posture_lb = q_nominal,
                     linear_posture_ub = q_nominal;
+    VectorX<double> q_initial = q_nominal;
 
-    drake::log()->info(
-        "Looping through clutter instances to add LinearConstraint.");
+    Vector3<double> bounded_position;
     // Iterate through each of the model instances of the clutter and add
     // elements
     // to the linear posture_constraint.
     for (auto& instance : clutter_model_instances_) {
       auto model_instance_bodies =
           scene_tree_ptr_->FindModelInstanceBodies(instance);
-      // drake::log()->info("Checking instance {}, num bodies : {}", 
-        // instance, model_instance_bodies.size());
       for (size_t i = 0; i < model_instance_bodies.size(); ++i) {
         auto body = model_instance_bodies[i];
-        // drake::log()->info("Checking instance {}, body id {}", instance,
-                           // body->get_body_index());
         if (body->has_joint()) {
-          // drake::log()->info("body id {} has a joint", body->get_body_index());
           const DrakeJoint* joint = &body->getJoint();
           if (!joint->is_fixed()) {
             int joint_dofs = joint->get_num_positions();
-            // drake::log()->info("body id {} has a floating joint of dim {}", 
-            //   body->get_body_index(), joint_dofs);
-
-            // Enforces checks only for revolute and floating quaternion joints.
+            // Enforces checks only for Floating quaternion joints.
             DRAKE_DEMAND(joint_dofs == 1 || joint_dofs == 7);
             VectorX<double> joint_lb = VectorX<double>::Zero(joint_dofs);
             VectorX<double> joint_ub = joint_lb;
 
             if (joint_dofs == 7) {
               // If the num dofs of the joint is 7 its a floating quaternion
-              // joint.
-              // Need to set the position part to be bounded in position.
-              // Need to set the orientation part to be a random quaternion.
-
+              // joint.The position part to be bounded by the clutter bounding
+              // box, the orientation part to be a random quaternion.
               // Position
               joint_lb.head(3) = clutter_lb_;
               joint_ub.head(3) = clutter_ub_;
@@ -280,29 +154,13 @@ VectorX<double> RandomClutterGenerator::Generate(
               joint_lb[4] = quat.x();
               joint_lb[5] = quat.y();
               joint_lb[6] = quat.z();
-
-              // drake::log()->info("Random quat: [{},{}, {}, {}]", 
-              //   quat.w(), quat.x(), quat.y(), quat.z());
-
               joint_ub.tail(4) = joint_lb.tail(4);
-
             } else if (joint_dofs == 1) {
               // If the num dofs of the joint is 1, set lb, ub to joint_lim_min,
               // joint_lim_max.
-
               joint_lb[0] = joint->getJointLimitMin()[0];
               joint_ub[0] = joint->getJointLimitMin()[0];
-
-              drake::log()->info("Adding world position constraint");
-              // set WorldPositionConstraint (bounds every object to the
-              // bounding box)
-              WorldPositionConstraint world_position_constraint(
-                  scene_tree_ptr_, body->get_body_index(),
-                  Eigen::Vector3d::Zero(), clutter_lb_, clutter_ub_);
-              constraint_array.push_back(&world_position_constraint);
             }
-            // drake::log()->info("Joint lb:[{}], ub:[{}]", 
-            //   joint_lb.transpose(), joint_ub.transpose());
 
             linear_posture_lb.segment(body->get_position_start_index(),
                                       joint_dofs) = joint_lb;
@@ -310,36 +168,20 @@ VectorX<double> RandomClutterGenerator::Generate(
                                       joint_dofs) = joint_ub;
           }
         }
-        // drake::log()->info("Finished checking body {}", body->get_body_index());
       }
-      // drake::log()->info("Finished checking model instance {}", instance);
     }
 
     linear_posture_A = VectorX<double>::Ones(linear_posture_iAfun.size());
 
-    drake::log()->info("About to add SingleTimeLinearPostureConstraint");
+    drake::log()->debug("Adding SingleTimeLinearPostureConstraint");
 
-    // drake::log()->info("linear_posture_ub : {}", linear_posture_ub.transpose());
-    // drake::log()->info("linear_posture_lb : {}", linear_posture_lb.transpose());
-    // drake::log()->info("linear_posture_iAfun : {}", linear_posture_iAfun.transpose());
-    // drake::log()->info("linear_posture_A : {}", linear_posture_A.transpose());
-    // Adding a single linear constraint for setting all orientations to
-    // their
-    // (initial) random orientations. This is needed to ensure that
-    // feasible
-    // orientations are generated as a result of the IK.
     SingleTimeLinearPostureConstraint linear_posture_constraint(
         scene_tree_ptr_, linear_posture_iAfun, linear_posture_jAvar,
         linear_posture_A, linear_posture_lb, linear_posture_ub);
 
     
-    VectorX<double> q_initial = 0.5 * (linear_posture_lb + linear_posture_ub);
-
-    // drake::log()->info("q_nominal : {}", q_nominal.transpose());
-    // drake::log()->info("q_initial : {}", q_nominal.transpose());
     constraint_array.push_back(&linear_posture_constraint);
-
-    drake::log()->info("Constraint array size {}", constraint_array.size());
+    drake::log()->debug("Constraint array size {}", constraint_array.size());
 
     IKoptions ikoptions(scene_tree_ptr_);
     ikoptions.setQ(Eigen::MatrixXd::Zero(q_initial.size(), q_initial.size()));
@@ -349,12 +191,11 @@ VectorX<double> RandomClutterGenerator::Generate(
     IKResults ik_results = inverseKinSimple(
         scene_tree_ptr_, q_initial, q_nominal, constraint_array, ikoptions);
 
-    int indx = 0;
     for (auto it : ik_results.info) {
-      drake::log()->info(" IK Result code {} : {}", indx++, it);
+      drake::log()->info("IK Result code : {}", it);
       ik_result_code = it;
       if (ik_result_code != 1) {
-        drake::log()->info("IK failure, recomputing IK");
+        drake::log()->debug("IK failure, recomputing IK");
       }
     }
 
@@ -362,29 +203,22 @@ VectorX<double> RandomClutterGenerator::Generate(
       q_ik_result = ik_results.q_sol.back();
     }
   }
-
-  // drake::log()->info("q_ik_result : {}", q_ik_result);
-  drake::log()->info("About to simulate dropping");
-
-  // Simulate Fall and return the state.
-  return DropObjectsToGround(q_ik_result);
+  return q_ik_result;
 }
 
 VectorX<double> RandomClutterGenerator::DropObjectsToGround(
-    const VectorX<double>& q_ik) {
+    const VectorX<double>& q_ik, double max_settling_time) {
   Simulator<double> simulator(*fall_sim_diagram_);
   int num_positions = scene_tree_ptr_->get_num_positions();
   int num_velocities = scene_tree_ptr_->get_num_velocities();
 
-  // setting initial condition
-  // auto diagram_context = sys->CreateDefaultContext();
+  // Setting initial condition
   VectorX<double> x_initial =
       VectorX<double>::Zero(num_positions + num_velocities);
 
   x_initial.head(scene_tree_ptr_->get_num_positions()) = q_ik;
-  
 
-simulator.get_mutable_context()
+  simulator.get_mutable_context()
       .get_mutable_continuous_state_vector()
       .SetFromVector(x_initial);
   simulator.Initialize();
@@ -394,40 +228,29 @@ simulator.get_mutable_context()
   simulator.get_mutable_integrator()->set_maximum_step_size(0.001);
   simulator.get_mutable_integrator()->set_fixed_step_mode(true);
 
+  VectorX<double> v = VectorX<double>::Zero(num_velocities);
 
-  VectorX<double> v =  VectorX<double>::Zero(
-                        num_velocities);
-
-
-  double step_time = 0.1, step_delta = 0.01;
-  double v_threshold = 1e-3;
+  double step_time = 0.5, step_delta = 0.1;
+  double v_threshold = 1e-1;
   VectorX<double> x = x_initial;
-  do{
-    drake::log()->info("Starting Simulation");
-    
-  //drake::log()->info("v_before {}", v.transpose());
-  drake::log()->info("v_norm before {}", v.norm());
+  do {
+    drake::log()->debug("Starting Simulation");
 
     simulator.StepTo(step_time);
-
-    step_time+=step_delta;
-
-    x = 
-    simulator.get_context().get_continuous_state_vector().CopyToVector();
-
-  drake::log()->info("v_after {}", v.transpose());
+    step_time += step_delta;
+    x = simulator.get_context().get_continuous_state_vector().CopyToVector();
     v = x.tail(num_velocities);
-    //drake::log()->info("v_before {}", v.transpose());
-  drake::log()->info("v_norm After {}", v.norm());
-  } while((v.array() > v_threshold).all());
-  
-  drake::log()->info("Copying the return vector");
-    return x.head(num_positions);
+  } while ((
+    v.array() > v_threshold).any() && step_time <= max_settling_time);
+
+  drake::log()->info("In-Simulation time : {} sec", step_time);
+  return x.head(num_positions);
 }
 
 std::unique_ptr<systems::Diagram<double>>
 RandomClutterGenerator::GenerateFallSimDiagram(
-    std::unique_ptr<RigidBodyTreed> scene_tree) {
+    std::unique_ptr<RigidBodyTreed> scene_tree,
+    const VisualizeSimulationCallback& visualize) {
   DiagramBuilder<double> builder;
 
   // Transferring ownership of tree to the RigidBodyPlant.
@@ -437,24 +260,18 @@ RandomClutterGenerator::GenerateFallSimDiagram(
 
   systems::CompliantMaterial default_material;
   default_material
-      .set_youngs_modulus(1e7)  // Pa
-      .set_dissipation(2)       // s/m
-      .set_friction(0.9, 0.5);
+      .set_youngs_modulus(1e6)  // Pa
+      .set_dissipation(9)       // s/m
+      .set_friction(1.2, 0.5);
   plant->set_default_compliant_material(default_material);
 
   systems::CompliantContactModelParameters model_parameters;
   model_parameters.characteristic_radius = 2e-4;  // m
-  model_parameters.v_stiction_tolerance = 0.01;   // m/s
+  model_parameters.v_stiction_tolerance = 0.1;    // m/s
   plant->set_contact_model_parameters(model_parameters);
 
-  if (visualize_steps_) {
-    auto drake_visualizer =
-        builder.template AddSystem<systems::DrakeVisualizer>(
-            plant->get_rigid_body_tree(), &lcm_);
-    drake_visualizer->set_name("DV");
-
-    builder.Connect(plant->get_output_port(0),
-                    drake_visualizer->get_input_port(0));
+  if (visualize) {
+    visualize(&builder, plant);
   }
 
   if (plant->get_num_actuators() > 0) {

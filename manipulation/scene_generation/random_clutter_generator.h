@@ -17,22 +17,48 @@ namespace manipulation {
 namespace scene_generation {
 
 /**
+ * Visualization for debugging purposes.
+ */
+typedef std::function<void(systems::DiagramBuilder<double>* diagram,
+                           systems::RigidBodyPlant<double>* plant)>
+    VisualizeSimulationCallback;
+
+/**
+ * Visualizes a simulation of a RigidBodyPlant containing a given RigidBodyTree.
+ */
+void VisualizeSimulationLcm(lcm::DrakeLcm* lcm,
+                            systems::DiagramBuilder<double>* diagram,
+                            systems::RigidBodyPlant<double>* plant);
+
+/**
+ * Binds an LCM object to `VisualizeSimulationLcm`.
+ */
+inline VisualizeSimulationCallback BindVisualizeSimulationLcm(
+    lcm::DrakeLcm* lcm) {
+  // NOLINTNEXTLINE(build/namespaces): For `bind`.
+  return std::bind(VisualizeSimulationLcm, lcm, std::placeholders::_1,
+                   std::placeholders::_2);
+}
+
+/**
  * Given a RigidBodyTree containing a given scene the RandomClutterGenerator
  * can repeatedly generate bounded random poses/configurations on selected
  * model instances within the tree.
  * Each of these objects are seperated from each other by (settable) minimum
  * distance and their object frames are located within a (settable) bounding
  * box volume.
- * This tool solves an IK problem to find feasible poses on the clutter
- * bodies and then executes a short-duration simulation to settle all of the
- * elements.
+ * This class provides 2 methods that (i) solves the IK problem to find feasible
+ * poses on the clutter bodies and (ii) executes a short-duration simulation
+ * to drop and settle all of the floating bodies onto the scene.
+ *
  * NOTES :
  * 1. Current version does not 'strongly' enforce the poses of the non-clutter
  * elements, i.e. the state of model instances that do not comprise the
  * clutter bodies and that are not fixed to the world may be perturbed during
  * the simulation phase.
- * 2. Current version assumes that all model instances on the tree contain only
- * the following joints : RevoluteJoint, and QuaternionFloatingJoint.
+ * 2. Current version only ensures bounded clutter for the case of all model
+ * instances on the tree containing the QuaternionFloatingJoint.
+ * 3. The current version has only been tested with SNOPT.
  */
 
 class RandomClutterGenerator {
@@ -50,34 +76,34 @@ class RandomClutterGenerator {
    */
   RandomClutterGenerator(std::unique_ptr<RigidBodyTreed> scene_tree,
                          std::vector<int> clutter_model_instances,
-                         Vector3<double> bounding_box_centroid,
-                         Vector3<double> bounding_box_size,
-                         bool visualize_steps,
+                         Vector3<double> clutter_centroid,
+                         Vector3<double> clutter_size,
+                         const VisualizeSimulationCallback& visualize = {},
                          double min_inter_object_distance = 0.001);
 
   /**
    * Generates the cluttered scene.
    * @return a ModelPosePair of the object model names and their poses.
    */
-  VectorX<double> Generate(VectorX<double> q_nominal,
-                           std::default_random_engine& generator);
+  VectorX<double> GenerateFloatingClutter(
+      VectorX<double> q_nominal, std::default_random_engine& generator);
+
+  /**
+   * Simulates a drop of the objects to the ground.
+   */
+  VectorX<double> DropObjectsToGround(const VectorX<double>& q_ik, 
+    double max_settling_time = 2.5);
+
+  /**
+   * Returns a pointer to the Sim diagram.
+   */
+  systems::Diagram<double>* GetSimDiagram();
 
  private:
-  // // Generates a random pose within the bounds of the problem.
-  // Isometry3<double> GenerateRandomBoundedPose();
-
-  // // Generates a random bounded tree configuration.
-  // VectorX<double> GetRandomBoundedConfiguration(
-  //   const RigidBodyTreed* scene_tree,
-  //   std::vector<int> clutter_model_instances,
-  //   VectorX<double> q_initial);
-
   // Builds a diagram of the clutter scene.
   std::unique_ptr<systems::Diagram<double>> GenerateFallSimDiagram(
-      std::unique_ptr<RigidBodyTreed> scene_tree);
-
-  // Simulates a drop of the objects to the ground.
-  VectorX<double> DropObjectsToGround(const VectorX<double>& q_ik);
+      std::unique_ptr<RigidBodyTreed> scene_tree,
+      const VisualizeSimulationCallback& visualize = {});
 
   RigidBodyTreed* scene_tree_ptr_{nullptr};
   std::vector<int> clutter_model_instances_;
@@ -86,11 +112,7 @@ class RandomClutterGenerator {
   Vector3<double> clutter_lb_{Vector3<double>::Zero()};
   Vector3<double> clutter_ub_{Vector3<double>::Zero()};
 
-  bool visualize_steps_{false};
-
   double inter_object_distance_{0.1};
-
-  lcm::DrakeLcm lcm_;
 
   std::unique_ptr<systems::Diagram<double>> fall_sim_diagram_{nullptr};
 
