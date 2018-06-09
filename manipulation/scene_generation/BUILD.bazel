@@ -26,10 +26,7 @@ drake_cc_binary(
     name = "random_clutter_demo",
     srcs = ["random_clutter_demo.cc"],
     data = [
-        "//examples/kuka_iiwa_arm:models",
-        "//examples/double_pendulum:models",
         "//examples/kuka_iiwa_arm:prod_models",
-        "//manipulation/models/jaco_description:models",
     ],
     deps = [
         ":random_clutter_generator",
@@ -39,12 +36,19 @@ drake_cc_binary(
     ],
 )
 
-# add_lint_tests()
+add_lint_tests()
 
-# # === test/ ===
+# === test/ ===
 
-# drake_cc_googletest(
-#     name = "random_clutter_test",
-#     data = [],
-#     deps = [],
-# )
+drake_cc_googletest(
+    name = "random_clutter_test",
+    data = [
+        "//examples/kuka_iiwa_arm:prod_models",
+    ],
+    deps = [
+        ":random_clutter_generator",
+        "//common",
+        "//common:text_logging_gflags",
+        "@gflags",
+    ],
+)

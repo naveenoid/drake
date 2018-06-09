@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "drake/common/eigen_types.h"
-#include "drake/manipulation/util/simple_tree_visualizer.h"
 #include "drake/manipulation/util/world_sim_tree_builder.h"
 #include "drake/math/random_rotation.h"
 #include "drake/multibody/joints/quaternion_floating_joint.h"
@@ -53,6 +52,18 @@ Eigen::VectorXi SimpleCumulativeSum(int num_elements) {
   return cumsum;
 }
 
+VectorX<double> GenerateBoundedRandomSample(
+    std::default_random_engine& generator, VectorX<double> min,
+    VectorX<double> max) {
+  DRAKE_DEMAND(min.size() == max.size());
+  VectorX<double> return_vector = VectorX<double>::Zero(min.size());
+  for (int i = 0; i < min.size(); ++i) {
+    uniform_real_distribution<double> distribution(min(i), max(i));
+    return_vector(i) = distribution(generator);
+  }
+  return return_vector;
+}
+
 }  // namespace
 
 void VisualizeSimulationLcm(lcm::DrakeLcm* lcm,
@@ -60,7 +71,7 @@ void VisualizeSimulationLcm(lcm::DrakeLcm* lcm,
                             systems::RigidBodyPlant<double>* plant) {
   auto drake_visualizer = builder->template AddSystem<systems::DrakeVisualizer>(
       plant->get_rigid_body_tree(), lcm);
-  drake_visualizer->set_name("DV");
+  drake_visualizer->set_name("DrakeViz");
 
   builder->Connect(plant->get_output_port(0),
                    drake_visualizer->get_input_port(0));
@@ -138,7 +149,7 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
             DRAKE_DEMAND(joint_dofs == 1 || joint_dofs == 7);
             VectorX<double> joint_lb = VectorX<double>::Zero(joint_dofs);
             VectorX<double> joint_ub = joint_lb;
-
+            VectorX<double> joint_initial = joint_ub;
             if (joint_dofs == 7) {
               // If the num dofs of the joint is 7 its a floating quaternion
               // joint.The position part to be bounded by the clutter bounding
@@ -146,6 +157,9 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
               // Position
               joint_lb.head(3) = clutter_lb_;
               joint_ub.head(3) = clutter_ub_;
+              auto temp_out = GenerateBoundedRandomSample(
+                  generator, clutter_lb_, clutter_ub_);
+              joint_initial.head(3) = temp_out;
 
               // Orientation
               Eigen::Quaterniond quat =
@@ -155,17 +169,21 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
               joint_lb[5] = quat.y();
               joint_lb[6] = quat.z();
               joint_ub.tail(4) = joint_lb.tail(4);
+              joint_initial.tail(4) = joint_ub.tail(4);
             } else if (joint_dofs == 1) {
               // If the num dofs of the joint is 1, set lb, ub to joint_lim_min,
               // joint_lim_max.
               joint_lb[0] = joint->getJointLimitMin()[0];
               joint_ub[0] = joint->getJointLimitMin()[0];
+              joint_initial =
+                  GenerateBoundedRandomSample(generator, joint_lb, joint_ub);
             }
-
             linear_posture_lb.segment(body->get_position_start_index(),
                                       joint_dofs) = joint_lb;
             linear_posture_ub.segment(body->get_position_start_index(),
                                       joint_dofs) = joint_ub;
+            q_initial.segment(body->get_position_start_index(), joint_dofs) =
+                joint_initial;
           }
         }
       }
@@ -179,7 +197,6 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
         scene_tree_ptr_, linear_posture_iAfun, linear_posture_jAvar,
         linear_posture_A, linear_posture_lb, linear_posture_ub);
 
-    
     constraint_array.push_back(&linear_posture_constraint);
     drake::log()->debug("Constraint array size {}", constraint_array.size());
 
@@ -233,6 +250,7 @@ VectorX<double> RandomClutterGenerator::DropObjectsToGround(
   double step_time = 0.5, step_delta = 0.1;
   double v_threshold = 1e-1;
   VectorX<double> x = x_initial;
+
   do {
     drake::log()->debug("Starting Simulation");
 
@@ -240,8 +258,7 @@ VectorX<double> RandomClutterGenerator::DropObjectsToGround(
     step_time += step_delta;
     x = simulator.get_context().get_continuous_state_vector().CopyToVector();
     v = x.tail(num_velocities);
-  } while ((
-    v.array() > v_threshold).any() && step_time <= max_settling_time);
+  } while ((v.array() > v_threshold).any() && step_time <= max_settling_time);
 
   drake::log()->info("In-Simulation time : {} sec", step_time);
   return x.head(num_positions);

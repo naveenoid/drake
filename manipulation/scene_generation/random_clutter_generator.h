@@ -6,11 +6,10 @@
 
 #include "drake/common/eigen_types.h"
 #include "drake/lcm/drake_lcm.h"
-#include "drake/manipulation/util/world_sim_tree_builder.h"
-#include "drake/multibody/rigid_body_constraint.h"
 #include "drake/multibody/rigid_body_plant/rigid_body_plant.h"
 #include "drake/multibody/rigid_body_tree.h"
 #include "drake/systems/framework/diagram.h"
+#include "drake/systems/framework/diagram_builder.h"
 
 namespace drake {
 namespace manipulation {
@@ -68,10 +67,12 @@ class RandomClutterGenerator {
    * @param scene_tree A unique_ptr to the tree containing the scene.
    * @param clutter_model_instances A set of model instance indices
    * corresponding to the bodies on the tree that should comprise the clutter
-   * @param bounding_box_centroid Centroid of the clutter bounding box in
+   * @param clutter_centroid Centroid of the clutter bounding box in
    * world coordinates.
-   * @param bounding_box_size The size of the clutter bounding box along the
+   * @param clutter_size The size of the clutter bounding box along the
    * length, breadth, and height.
+   * @param visualize The callback to a visualization object (for the
+   * dropping object simulation phase).
    * @param min_inter_object_distance Minimum distance between objects.
    */
   RandomClutterGenerator(std::unique_ptr<RigidBodyTreed> scene_tree,
@@ -82,17 +83,23 @@ class RandomClutterGenerator {
                          double min_inter_object_distance = 0.001);
 
   /**
-   * Generates the cluttered scene.
+   * Generates the "Floating" clutter scene by solving an IK problem.
    * @return a ModelPosePair of the object model names and their poses.
+   * @param q_nominal : nominal configuration for the scene_tree. Poses of
+   * the model_instances not specified in `clutter_model_instances' are set
+   * to this value.
+   * @param generator : used to pass a seed.
    */
   VectorX<double> GenerateFloatingClutter(
       VectorX<double> q_nominal, std::default_random_engine& generator);
 
   /**
    * Simulates a drop of the objects to the ground.
+   * @param max_settling_time is the max time to wait for settling the
+   * clutter scene.
    */
-  VectorX<double> DropObjectsToGround(const VectorX<double>& q_ik, 
-    double max_settling_time = 2.5);
+  VectorX<double> DropObjectsToGround(const VectorX<double>& q_ik,
+                                      double max_settling_time = 2.5);
 
   /**
    * Returns a pointer to the Sim diagram.
