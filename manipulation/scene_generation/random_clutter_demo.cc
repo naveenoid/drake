@@ -28,6 +28,7 @@ DEFINE_int32(max_iterations, 100, "Max iterations for this demo.");
 DEFINE_bool(visualize, true, "turn on visualization of the demo");
 DEFINE_double(max_settling_time, 1.5, "maximum simulation time for settling the" 
   "object");
+DEFINE_double(v_threshold, 0.1, "velocity threshold to terminate sim early");
 
 const string kPath = "examples/kuka_iiwa_arm/models/objects/";
 
@@ -106,13 +107,14 @@ int DoMain() {
 
   std::default_random_engine generator(123);
 
+  VectorX<double> v_final;
   double sum = 0, mean = 0;
   for (int i = 0; i < FLAGS_max_iterations; ++i) {
     tstart = time(0);
     VectorX<double> q_ik =
         clutter->GenerateFloatingClutter(q_nominal, generator);
     drake::log()->debug("Successfully computed clutter. About to simulate dropping");
-    dropper->Run(q_ik, FLAGS_max_settling_time);
+    dropper->Run(q_ik, &v_final, FLAGS_v_threshold, FLAGS_max_settling_time);
     tend = time(0);
 
     double process_time = std::difftime(tend, tstart);

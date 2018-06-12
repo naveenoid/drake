@@ -16,9 +16,13 @@ namespace scene_generation {
  * Given a RigidBodyPlant, this class allows the construction and excution of a 
  * Simulation which enables the state of the plant to come to a rest from a 
  * specified initial condition through the application of 0 magnitude of torques
- * at the input. .
+ * at the input. 
+ * Note that the actual time taken to come to rest is very strongly dependent on
+ * the kind of bodies and their inertial properties. The parameters for 
+ * the simulation are currently hand-tuned to bring to rest 1-30 bodies 
+ * of dimension  and mass comparable to the manipulation targets in 
+ * '/examples/kuka_iiwa_arm/objects/'
  */
-
 class SimulatePlantToRest {
  public:
   /**
@@ -32,12 +36,21 @@ class SimulatePlantToRest {
       std::unique_ptr<systems::DrakeVisualizer> visualizer = {});
 
   /**
-   * Simulates a drop of the objects to the ground.
+   * Computes a simulation Run of the system starting from the configuration
+   * @q_initial.
+   * @param v_final A pointer to a VectorX<double> to hold the resulting final
+   * velocity upon completion of this simulation run.
+   * @param v_threshold threshold on the velocity to terminate the execution
+   * and return the terminal state. 
    * @param max_settling_time is the max time to wait for settling the
    * clutter scene.
+   * Upon reaching @param max_settling_time, the simulation terminates regardless 
+   * of the specified @param v_threshold. 
    */
-  VectorX<double> Run(const VectorX<double>& q_ik,
-                      double max_settling_time = 1.5);
+  VectorX<double> Run(
+    const VectorX<double>& q_initial, VectorX<double> *v_final = nullptr, 
+    double v_threshold = 0.1,
+    double max_settling_time = 1.5);
 
   /**
    * Returns a pointer to the Sim diagram.

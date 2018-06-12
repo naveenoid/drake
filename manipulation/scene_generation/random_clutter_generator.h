@@ -18,18 +18,22 @@ namespace scene_generation {
  * Each of these objects are seperated from each other by (settable) minimum
  * distance and their object frames are located within a (settable) bounding
  * box volume.
- * This class provides 2 methods that (i) solves the IK problem to find feasible
- * poses on the clutter bodies and (ii) executes a short-duration simulation
- * to drop and settle all of the floating bodies onto the scene.
- *
+ * This class solves the IK problem to find feasible
+ * poses on the clutter bodies
+ * 
  * NOTES :
- * 1. Current version does not 'strongly' enforce the poses of the non-clutter
- * elements, i.e. the state of model instances that do not comprise the
- * clutter bodies and that are not fixed to the world may be perturbed during
- * the simulation phase.
- * 2. Current version only ensures bounded clutter for the case of all model
+ * 1. Current version only ensures bounded clutter for the case of all model
  * instances on the tree containing the QuaternionFloatingJoint.
- * 3. The current version has only been tested with SNOPT.
+ * 2. The current version has only been tested with SNOPT.
+ * 3. The solvability of the problem is strongly dependent on the dimensions 
+ * of the clutter bounding volume as specified in clutter_size and the number
+ * and geometry of the clutter model instances that are to be dealt with. There 
+ * is no explicit time-out on the execution and the GenerateFloatingClutter 
+ * will keep attempting to find a solution, if any.
+ * 4. There are no explicit guarantees on the solvability
+ * 5. The underlying IK computations utilise the bullet collision library and 
+ * as such only process the convex-hull of the geometry. The resulting IK 
+ * solution will be subject to this simplification. 
  */
 
 class RandomClutterGenerator {

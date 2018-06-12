@@ -60,8 +60,9 @@ std::unique_ptr<systems::Diagram<double>> SimulatePlantToRest::GenerateDiagram(
   return builder.Build();
 }
 
-VectorX<double> SimulatePlantToRest::Run(const VectorX<double>& q_ik,
-                                         double max_settling_time) {
+VectorX<double> SimulatePlantToRest::Run(
+  const VectorX<double>& q_ik, VectorX<double> *v_final, 
+  double v_threshold, double max_settling_time) {
   systems::Simulator<double> simulator(*diagram_);
 
   int num_positions = plant_ptr_->get_num_positions();
@@ -86,7 +87,6 @@ VectorX<double> SimulatePlantToRest::Run(const VectorX<double>& q_ik,
   VectorX<double> v = VectorX<double>::Zero(num_velocities);
 
   double step_time = 0.5, step_delta = 0.1;
-  double v_threshold = 1e-1;
   VectorX<double> x = x_initial;
 
   do {
@@ -98,6 +98,9 @@ VectorX<double> SimulatePlantToRest::Run(const VectorX<double>& q_ik,
     v = x.tail(num_velocities);
   } while ((v.array() > v_threshold).any() && step_time <= max_settling_time);
 
+  if(v_final != nullptr) {
+    *v_final = v;
+  }
   drake::log()->info("In-Simulation time : {} sec", step_time);
   return x.head(num_positions);
 }

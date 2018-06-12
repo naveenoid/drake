@@ -52,7 +52,7 @@ add_lint_tests()
 # === test/ ===
 
 drake_cc_googletest(
-    name = "random_clutter_to_rest_test",
+    name = "test_random_clutter_to_rest",
     data = [
         "//examples/kuka_iiwa_arm:prod_models",
     ],
