@@ -32,8 +32,8 @@ std::unique_ptr<systems::Diagram<double>> SimulatePlantToRest::GenerateDiagram(
 
   systems::CompliantMaterial default_material;
   default_material
-      .set_youngs_modulus(1e6)  // Pa
-      .set_dissipation(9)       // s/m
+      .set_youngs_modulus(5e6)  // Pa
+      .set_dissipation(12)       // s/m
       .set_friction(1.2, 0.5);
   plant->set_default_compliant_material(default_material);
 
@@ -72,32 +72,36 @@ VectorX<double> SimulatePlantToRest::Run(
   VectorX<double> x_initial =
       VectorX<double>::Zero(num_positions + num_velocities);
 
+  VectorX<double> v = VectorX<double>::Zero(num_velocities);
   x_initial.head(num_positions) = q_ik;
 
-  simulator.get_mutable_context()
-      .get_mutable_continuous_state_vector()
-      .SetFromVector(x_initial);
-  simulator.Initialize();
-
-  simulator.reset_integrator<systems::RungeKutta2Integrator<double>>(
-      *diagram_, 0.0001, &simulator.get_mutable_context());
-  simulator.get_mutable_integrator()->set_maximum_step_size(0.001);
-  simulator.get_mutable_integrator()->set_fixed_step_mode(true);
-
-  VectorX<double> v = VectorX<double>::Zero(num_velocities);
-
-  double step_time = 0.5, step_delta = 0.1;
   VectorX<double> x = x_initial;
-
+  double step_time, step_delta;
+  double max_step_size = 0.001;
   do {
-    drake::log()->debug("Starting Simulation");
+    simulator.get_mutable_context()
+        .get_mutable_continuous_state_vector()
+        .SetFromVector(x_initial);
+    simulator.Initialize();
+    simulator.get_mutable_context().set_time(0.0);
 
-    simulator.StepTo(step_time);
-    step_time += step_delta;
-    x = simulator.get_context().get_continuous_state_vector().CopyToVector();
-    v = x.tail(num_velocities);
-  } while ((v.array() > v_threshold).any() && step_time <= max_settling_time);
+    simulator.reset_integrator<systems::RungeKutta2Integrator<double>>(
+        *diagram_, 0.0001, &simulator.get_mutable_context());
+    simulator.get_mutable_integrator()->set_maximum_step_size(max_step_size);
+    simulator.get_mutable_integrator()->set_fixed_step_mode(true);
+    step_time = 1.0; step_delta = 0.1;
+    do {
+      drake::log()->debug("Starting Simulation");
 
+      simulator.StepTo(step_time);
+      step_time += step_delta;
+      x = simulator.get_context().get_continuous_state_vector().CopyToVector();
+      v = x.tail(num_velocities);
+    } while ((v.array() > v_threshold).any() && step_time <= max_settling_time);  
+    // If terminal velocities are nan, then half the step size and try again.
+    max_step_size /= 2.0;
+  } while (isnan(v.array()).any());
+  
   if(v_final != nullptr) {
     *v_final = v;
   }

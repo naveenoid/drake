@@ -10,6 +10,7 @@
 #include "drake/manipulation/scene_generation/random_clutter_generator.h"
 #include "drake/manipulation/scene_generation/simulate_plant_to_rest.h"
 #include "drake/manipulation/util/world_sim_tree_builder.h"
+#include "drake/manipulation/util/simple_tree_visualizer.h"
 #include "drake/multibody/rigid_body_tree.h"
 #include "drake/multibody/rigid_body_plant/drake_visualizer.h"
 
@@ -25,7 +26,9 @@ using std::map;
 
 DEFINE_int32(repetitions, 1, "each of 4 models is repeated this many times");
 DEFINE_int32(max_iterations, 100, "Max iterations for this demo.");
-DEFINE_bool(visualize, true, "turn on visualization of the demo");
+DEFINE_bool(visualize_only_terminal_state, true, "turn on visualization of the "
+  "demo only at terminal states : i.e. when ik is available and when the simulate "
+  "to rest terminates");
 DEFINE_double(max_settling_time, 1.5, "maximum simulation time for settling the" 
   "object");
 DEFINE_double(v_threshold, 0.1, "velocity threshold to terminate sim early");
@@ -92,36 +95,60 @@ int DoMain() {
 
   clutter = std::make_unique<RandomClutterGenerator>(
         scene_tree.get(), clutter_instances,
-        Vector3<double>(0.0, 0.0, 0.4),
+        Vector3<double>(0.0, 0.0, 0.1),
         Vector3<double>(0.2, 0.4, 0.4 * FLAGS_repetitions));
      
   auto scene_plant = 
   std::make_unique<systems::RigidBodyPlant<double>>(
     std::move(scene_tree));
 
+  std::unique_ptr<SimpleTreeVisualizer> simple_tree_visualizer;
+
+  std::unique_ptr<SimulatePlantToRest> dropper;
+
+  if(!FLAGS_visualize_only_terminal_state) {
   auto drake_visualizer = std::make_unique<systems::DrakeVisualizer>(
-    scene_plant->get_rigid_body_tree(), &lcm);
-
-  auto dropper = std::make_unique<SimulatePlantToRest>(std::move(scene_plant), 
+    scene_plant->get_rigid_body_tree(), &lcm);  
+  dropper = std::make_unique<SimulatePlantToRest>(std::move(scene_plant), 
     std::move(drake_visualizer));
-
+  } else {
+    simple_tree_visualizer = std::make_unique<SimpleTreeVisualizer>(
+      scene_plant->get_rigid_body_tree(), &lcm);
+    dropper = std::make_unique<SimulatePlantToRest>(std::move(scene_plant));
+  }
+  
   std::default_random_engine generator(123);
 
-  VectorX<double> v_final;
-  double sum = 0, mean = 0;
+  VectorX<double> q_final, v_final;
+  double sum_ik = 0, mean_ik = 0, sum_total = 0, mean_total = 0;;
   for (int i = 0; i < FLAGS_max_iterations; ++i) {
     tstart = time(0);
     VectorX<double> q_ik =
         clutter->GenerateFloatingClutter(q_nominal, generator);
-    drake::log()->debug("Successfully computed clutter. About to simulate dropping");
-    dropper->Run(q_ik, &v_final, FLAGS_v_threshold, FLAGS_max_settling_time);
+    if(FLAGS_visualize_only_terminal_state) {
+      simple_tree_visualizer->visualize(q_ik);
+    }
+
     tend = time(0);
+    double ik_time = std::difftime(tend, tstart);
+
+    sum_ik += ik_time;
+    mean_ik = sum_ik / (i + 1.0);
+    drake::log()->debug("Successfully computed clutter. About to simulate dropping");
+    q_final = dropper->Run(q_ik, &v_final, FLAGS_v_threshold, FLAGS_max_settling_time);
+    tend = time(0);
+    
+    if(FLAGS_visualize_only_terminal_state) {
+      simple_tree_visualizer->visualize(q_final);
+    }
 
     double process_time = std::difftime(tend, tstart);
-    sum += process_time;
-    mean = sum / (i + 1.0);
+    sum_total += process_time;
+    mean_total = sum_total / (i + 1.0);
+    drake::log()->info("IK time : {} sec", ik_time);
     drake::log()->info("Computation time : {} sec", process_time);
-    drake::log()->info("Mean computation time : {}", mean);
+    drake::log()->info("Trials : {}, Mean computation time : {}", i, mean_total);
+    drake::log()->info("Trials : {}, Mean ik time : {}", i, mean_ik);
   }
   
   return 0;

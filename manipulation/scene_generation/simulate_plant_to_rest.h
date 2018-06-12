@@ -44,6 +44,9 @@ class SimulatePlantToRest {
    * and return the terminal state. 
    * @param max_settling_time is the max time to wait for settling the
    * clutter scene.
+   * @param bounding_radius is a threshold on the distance each model travels during
+   * simulation. This argument is used to guard against sim explosion - and results in
+   * re-running the sim with smaller max time step.
    * Upon reaching @param max_settling_time, the simulation terminates regardless 
    * of the specified @param v_threshold. 
    */
