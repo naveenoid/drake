@@ -11,6 +11,7 @@
 #include "drake/manipulation/scene_generation/simulate_plant_to_rest.h"
 #include "drake/manipulation/util/world_sim_tree_builder.h"
 #include "drake/multibody/rigid_body_tree.h"
+#include "drake/multibody/rigid_body_plant/drake_visualizer.h"
 
 #include <ctime>
 
@@ -92,14 +93,16 @@ int DoMain() {
         scene_tree.get(), clutter_instances,
         Vector3<double>(0.0, 0.0, 0.4),
         Vector3<double>(0.2, 0.4, 0.4 * FLAGS_repetitions));
-  
-  std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant = 
-  std::make_unique<systems::RigidBodyPlant<double>>(std::move(scene_tree));
+     
+  auto scene_plant = 
+  std::make_unique<systems::RigidBodyPlant<double>>(
+    std::move(scene_tree));
 
-  std::unique_ptr<SimulatePlantToRest> dropper;
+  auto drake_visualizer = std::make_unique<systems::DrakeVisualizer>(
+    scene_plant->get_rigid_body_tree(), &lcm);
 
-  dropper = std::make_unique<SimulatePlantToRest>(std::move(scene_plant), 
-    FLAGS_visualize ? BindDrakeVisualizer(&lcm) : nullptr);
+  auto dropper = std::make_unique<SimulatePlantToRest>(std::move(scene_plant), 
+    std::move(drake_visualizer));
 
   std::default_random_engine generator(123);
 

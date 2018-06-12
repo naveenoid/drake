@@ -2,36 +2,32 @@
 
 #include "drake/common/eigen_types.h"
 #include "drake/lcm/drake_lcm.h"
-#include "drake/multibody/rigid_body_plant/rigid_body_plant.h"
 #include "drake/multibody/rigid_body_plant/drake_visualizer.h"
+#include "drake/multibody/rigid_body_plant/rigid_body_plant.h"
+#include "drake/systems/analysis/runge_kutta2_integrator.h"
+#include "drake/systems/analysis/simulator.h"
 #include "drake/systems/framework/diagram.h"
 #include "drake/systems/framework/diagram_builder.h"
 #include "drake/systems/framework/leaf_system.h"
-#include "drake/systems/analysis/simulator.h"
 #include "drake/systems/primitives/constant_vector_source.h"
-#include "drake/systems/analysis/runge_kutta2_integrator.h"
 
 namespace drake {
 namespace manipulation {
 namespace scene_generation {
 
-
-std::unique_ptr<systems::LeafSystem<double>> DrakeVisualizerCallback(lcm::DrakeLcm* lcm, systems::RigidBodyPlant<double>* plant) {
-  return std::make_unique<systems::DrakeVisualizer>(plant->get_rigid_body_tree(), lcm);
-}
-
 SimulatePlantToRest::SimulatePlantToRest(
-	std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant, const VisualizerSystemCallback& visualizer) :
-	 plant_ptr_(scene_plant.get()), diagram_(GenerateDiagram(std::move(scene_plant), visualizer)) {
-	 }
+    std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant,
+    std::unique_ptr<systems::DrakeVisualizer> visualizer)
+    : plant_ptr_(scene_plant.get()),
+      diagram_(GenerateDiagram(std::move(scene_plant), std::move(visualizer))) {}
 
 std::unique_ptr<systems::Diagram<double>> SimulatePlantToRest::GenerateDiagram(
-	std::move(scene_plant), visualizer) {
+    std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant, 
+    std::unique_ptr<systems::DrakeVisualizer> visualizer) {
   systems::DiagramBuilder<double> builder;
 
   // Transferring ownership of tree to the RigidBodyPlant.
-  auto plant = builder.template AddSystem(
-      std::move(scene_plant));
+  auto plant = builder.template AddSystem(std::move(scene_plant));
   plant->set_name("RBP");
 
   systems::CompliantMaterial default_material;
@@ -46,14 +42,13 @@ std::unique_ptr<systems::Diagram<double>> SimulatePlantToRest::GenerateDiagram(
   model_parameters.v_stiction_tolerance = 0.1;    // m/s
   plant->set_contact_model_parameters(model_parameters);
 
-  if (visualize) {
-   	auto visualizer_system = builder.template AddSystem(
-   		std::move(visualizer(plant)));
-	visualizer_system->set_name("visualizer");
+  if (visualizer) {
+    auto visualizer_system =
+        builder.template AddSystem(std::move(visualizer));
+    visualizer_system->set_name("visualizer");
 
-  builder.Connect(plant->get_output_port(0),
-                   visualizer_system->get_input_port(0));
-
+    builder.Connect(plant->get_output_port(0),
+                    visualizer_system->get_input_port(0));
   }
 
   if (plant->get_num_actuators() > 0) {
@@ -65,10 +60,9 @@ std::unique_ptr<systems::Diagram<double>> SimulatePlantToRest::GenerateDiagram(
   return builder.Build();
 }
 
-
-VectorX<double> SimulatePlantToRest::Run(const VectorX<double>& q_ik, 
-	double max_settling_time) {
-	systems::Simulator<double> simulator(*diagram_);
+VectorX<double> SimulatePlantToRest::Run(const VectorX<double>& q_ik,
+                                         double max_settling_time) {
+  systems::Simulator<double> simulator(*diagram_);
 
   int num_positions = plant_ptr_->get_num_positions();
   int num_velocities = plant_ptr_->get_num_velocities();
@@ -85,7 +79,7 @@ VectorX<double> SimulatePlantToRest::Run(const VectorX<double>& q_ik,
   simulator.Initialize();
 
   simulator.reset_integrator<systems::RungeKutta2Integrator<double>>(
-      *fall_sim_diagram_, 0.0001, &simulator.get_mutable_context());
+      *diagram_, 0.0001, &simulator.get_mutable_context());
   simulator.get_mutable_integrator()->set_maximum_step_size(0.001);
   simulator.get_mutable_integrator()->set_fixed_step_mode(true);
 
@@ -106,7 +100,6 @@ VectorX<double> SimulatePlantToRest::Run(const VectorX<double>& q_ik,
 
   drake::log()->info("In-Simulation time : {} sec", step_time);
   return x.head(num_positions);
-
 }
 
 }  // namespace scene_generation
