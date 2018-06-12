@@ -1,15 +1,37 @@
 #pragma once
 
-#include <random>
-#include <string>
-#include <vector>
-
 #include "drake/common/eigen_types.h"
-#include "drake/multibody/rigid_body_tree.h"
+#include "drake/lcm/drake_lcm.h"
+#include "drake/multibody/rigid_body_plant/rigid_body_plant.h"
+#include "drake/systems/framework/diagram.h"
+#include "drake/systems/framework/diagram_builder.h"
+#include "drake/systems/framework/leaf_system.h"
 
 namespace drake {
 namespace manipulation {
 namespace scene_generation {
+
+/**
+ * Visualization for debugging purposes.
+ */
+typedef std::function<std::unique_ptr<systems::LeafSystem<double>>(
+	systems::RigidBodyPlant<double>* plant)>
+    VisualizerSystemCallback;
+
+/**
+ * Visualizes a simulation of a RigidBodyPlant containing a given RigidBodyTree.
+ */
+std::unique_ptr<systems::LeafSystem<double>> DrakeVisualizerCallback(
+	lcm::DrakeLcm* lcm, systems::RigidBodyPlant<double>* plant);
+
+/**
+ * Binds an LCM object to `VisualizeSimulationLcm`.
+ */
+inline VisualizerSystemCallback BindDrakeVisualizer(
+    lcm::DrakeLcm* lcm) {
+  // NOLINTNEXTLINE(build/namespaces): For `bind`.
+  return std::bind(DrakeVisualizerCallback, lcm, std::placeholders::_1);
+}
 
 /**
  * Given a RigidBodyTree containing a given scene the RandomClutterGenerator
@@ -32,7 +54,7 @@ namespace scene_generation {
  * 3. The current version has only been tested with SNOPT.
  */
 
-class RandomClutterGenerator {
+class SimulatePlantToRest {
  public:
   /**
    * Constructs the RandomClutterGenerator
@@ -47,32 +69,29 @@ class RandomClutterGenerator {
    * dropping object simulation phase).
    * @param min_inter_object_distance Minimum distance between objects.
    */
-  RandomClutterGenerator(RigidBodyTree<double>* scene_tree,
-                         std::vector<int> clutter_model_instances,
-                         Vector3<double> clutter_center,
-                         Vector3<double> clutter_size,
-                         double min_inter_object_distance = 0.001);
+  SimulatePlantToRest(std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant,
+                         const VisualizerSystemCallback& visualizer = {});
 
   /**
-   * Generates the "Floating" clutter scene by solving an IK problem.
-   * @return a ModelPosePair of the object model names and their poses.
-   * @param q_nominal : nominal configuration for the scene_tree. Poses of
-   * the model_instances not specified in `clutter_model_instances' are set
-   * to this value.
-   * @param generator : used to pass a seed.
+   * Simulates a drop of the objects to the ground.
+   * @param max_settling_time is the max time to wait for settling the
+   * clutter scene.
    */
-  VectorX<double> GenerateFloatingClutter(
-      VectorX<double> q_nominal, std::default_random_engine& generator);
+  VectorX<double> Run(const VectorX<double>& q_ik,
+                            double max_settling_time = 1.5);
+
+  /**
+   * Returns a pointer to the Sim diagram.
+   */
+  systems::Diagram<double>* GetSimDiagram();
 
  private:
-  RigidBodyTreed *scene_tree_ptr_;
-  std::vector<int> clutter_model_instances_;
-
-  Vector3<double> clutter_center_{Vector3<double>::Zero()};
-  Vector3<double> clutter_lb_{Vector3<double>::Zero()};
-  Vector3<double> clutter_ub_{Vector3<double>::Zero()};
-
-  double inter_object_distance_{0.1};
+  // Builds a diagram of the clutter scene.
+  std::unique_ptr<systems::Diagram<double>> GenerateDiagram(
+      std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant,
+      const VisualizerSystemCallback& visualizer = {});
+  systems::RigidBodyPlant<double> *plant_ptr_{nullptr};
+  std::unique_ptr<systems::Diagram<double>> diagram_;
 };
 
 }  // namespace scene_generation

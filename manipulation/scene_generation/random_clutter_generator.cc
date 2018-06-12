@@ -4,20 +4,10 @@
 #include <vector>
 
 #include "drake/common/eigen_types.h"
-#include "drake/manipulation/util/world_sim_tree_builder.h"
 #include "drake/math/random_rotation.h"
 #include "drake/multibody/joints/quaternion_floating_joint.h"
 #include "drake/multibody/rigid_body_constraint.h"
 #include "drake/multibody/rigid_body_ik.h"
-#include "drake/multibody/rigid_body_plant/drake_visualizer.h"
-#include "drake/multibody/rigid_body_plant/rigid_body_plant.h"
-#include "drake/multibody/rigid_body_tree_construction.h"
-#include "drake/systems/analysis/runge_kutta2_integrator.h"
-#include "drake/systems/analysis/simulator.h"
-#include "drake/systems/framework/continuous_state.h"
-#include "drake/systems/framework/diagram.h"
-#include "drake/systems/framework/diagram_builder.h"
-#include "drake/systems/primitives/constant_vector_source.h"
 
 namespace drake {
 namespace manipulation {
@@ -30,19 +20,10 @@ using std::map;
 using std::string;
 using std::stringstream;
 using std::vector;
-using util::WorldSimTreeBuilder;
 using std::default_random_engine;
 using std::uniform_real_distribution;
-using systems::RigidBodyPlant;
-using systems::DiagramBuilder;
-using systems::DrakeVisualizer;
-using systems::Simulator;
-using systems::RungeKutta2Integrator;
-using systems::ContinuousState;
-using util::ModelInstanceInfo;
 
 namespace {
-
 Eigen::VectorXi SimpleCumulativeSum(int num_elements) {
   Eigen::VectorXi cumsum = Eigen::VectorXi::Constant(num_elements, 0);
   int i = 0;
@@ -66,23 +47,13 @@ VectorX<double> GenerateBoundedRandomSample(
 
 }  // namespace
 
-void VisualizeSimulationLcm(lcm::DrakeLcm* lcm,
-                            systems::DiagramBuilder<double>* builder,
-                            systems::RigidBodyPlant<double>* plant) {
-  auto drake_visualizer = builder->template AddSystem<systems::DrakeVisualizer>(
-      plant->get_rigid_body_tree(), lcm);
-  drake_visualizer->set_name("DrakeViz");
-
-  builder->Connect(plant->get_output_port(0),
-                   drake_visualizer->get_input_port(0));
-}
-
 RandomClutterGenerator::RandomClutterGenerator(
-    std::unique_ptr<RigidBodyTreed> scene_tree,
-    std::vector<int> clutter_model_instances, Vector3<double> clutter_center,
-    Vector3<double> clutter_size, const VisualizeSimulationCallback& visualize,
+    RigidBodyTree<double>* scene_tree,
+    std::vector<int> clutter_model_instances, 
+    Vector3<double> clutter_center,
+    Vector3<double> clutter_size,
     double min_inter_object_distance)
-    : scene_tree_ptr_(scene_tree.get()),
+    : scene_tree_ptr_(scene_tree),
       clutter_model_instances_(clutter_model_instances),
       clutter_center_(clutter_center),
       clutter_lb_(-0.5 * clutter_size),
@@ -95,9 +66,8 @@ RandomClutterGenerator::RandomClutterGenerator(
     // check that the tree contains the model instance in question. i.e
     // atleast one body exists for each model instance listed in
     // clutter_model_instance.
-    DRAKE_DEMAND(scene_tree->FindModelInstanceBodies(it).size() > 0);
+    DRAKE_DEMAND(scene_tree_ptr_->FindModelInstanceBodies(it).size() > 0);
   }
-  fall_sim_diagram_ = GenerateFallSimDiagram(std::move(scene_tree), visualize);
 }
 
 VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
@@ -223,82 +193,6 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
   return q_ik_result;
 }
 
-VectorX<double> RandomClutterGenerator::DropObjectsToGround(
-    const VectorX<double>& q_ik, double max_settling_time) {
-  Simulator<double> simulator(*fall_sim_diagram_);
-  int num_positions = scene_tree_ptr_->get_num_positions();
-  int num_velocities = scene_tree_ptr_->get_num_velocities();
-
-  // Setting initial condition
-  VectorX<double> x_initial =
-      VectorX<double>::Zero(num_positions + num_velocities);
-
-  x_initial.head(scene_tree_ptr_->get_num_positions()) = q_ik;
-
-  simulator.get_mutable_context()
-      .get_mutable_continuous_state_vector()
-      .SetFromVector(x_initial);
-  simulator.Initialize();
-
-  simulator.reset_integrator<RungeKutta2Integrator<double>>(
-      *fall_sim_diagram_, 0.0001, &simulator.get_mutable_context());
-  simulator.get_mutable_integrator()->set_maximum_step_size(0.001);
-  simulator.get_mutable_integrator()->set_fixed_step_mode(true);
-
-  VectorX<double> v = VectorX<double>::Zero(num_velocities);
-
-  double step_time = 0.5, step_delta = 0.1;
-  double v_threshold = 1e-1;
-  VectorX<double> x = x_initial;
-
-  do {
-    drake::log()->debug("Starting Simulation");
-
-    simulator.StepTo(step_time);
-    step_time += step_delta;
-    x = simulator.get_context().get_continuous_state_vector().CopyToVector();
-    v = x.tail(num_velocities);
-  } while ((v.array() > v_threshold).any() && step_time <= max_settling_time);
-
-  drake::log()->info("In-Simulation time : {} sec", step_time);
-  return x.head(num_positions);
-}
-
-std::unique_ptr<systems::Diagram<double>>
-RandomClutterGenerator::GenerateFallSimDiagram(
-    std::unique_ptr<RigidBodyTreed> scene_tree,
-    const VisualizeSimulationCallback& visualize) {
-  DiagramBuilder<double> builder;
-
-  // Transferring ownership of tree to the RigidBodyPlant.
-  auto plant = builder.template AddSystem<systems::RigidBodyPlant<double>>(
-      std::move(scene_tree));
-  plant->set_name("RBP");
-
-  systems::CompliantMaterial default_material;
-  default_material
-      .set_youngs_modulus(1e6)  // Pa
-      .set_dissipation(9)       // s/m
-      .set_friction(1.2, 0.5);
-  plant->set_default_compliant_material(default_material);
-
-  systems::CompliantContactModelParameters model_parameters;
-  model_parameters.characteristic_radius = 2e-4;  // m
-  model_parameters.v_stiction_tolerance = 0.1;    // m/s
-  plant->set_contact_model_parameters(model_parameters);
-
-  if (visualize) {
-    visualize(&builder, plant);
-  }
-
-  if (plant->get_num_actuators() > 0) {
-    auto zero_input = builder.template AddSystem<systems::ConstantVectorSource>(
-        Eigen::VectorXd::Zero(plant->get_num_actuators()));
-    builder.Connect(zero_input->get_output_port(), plant->get_input_port(0));
-  }
-
-  return builder.Build();
-}
 
 }  // namespace scene_generation
 }  // namespace manipulation

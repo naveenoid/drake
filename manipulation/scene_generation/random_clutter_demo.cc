@@ -8,6 +8,7 @@
 #include "drake/common/text_logging_gflags.h"
 #include "drake/lcm/drake_lcm.h"
 #include "drake/manipulation/scene_generation/random_clutter_generator.h"
+#include "drake/manipulation/scene_generation/simulate_plant_to_rest.h"
 #include "drake/manipulation/util/world_sim_tree_builder.h"
 #include "drake/multibody/rigid_body_tree.h"
 
@@ -24,6 +25,8 @@ using std::map;
 DEFINE_int32(repetitions, 1, "each of 4 models is repeated this many times");
 DEFINE_int32(max_iterations, 100, "Max iterations for this demo.");
 DEFINE_bool(visualize, true, "turn on visualization of the demo");
+DEFINE_double(max_settling_time, 1.5, "maximum simulation time for settling the" 
+  "object");
 
 const string kPath = "examples/kuka_iiwa_arm/models/objects/";
 
@@ -85,18 +88,18 @@ int DoMain() {
       VectorX<double>::Random(scene_tree->get_num_positions());
   std::unique_ptr<RandomClutterGenerator> clutter;
 
-  if (FLAGS_visualize) {
-    clutter = std::make_unique<RandomClutterGenerator>(
-        std::move(scene_tree), clutter_instances,
-        Vector3<double>(0.0, 0.0, 0.4),
-        Vector3<double>(0.2, 0.4, 0.4 * FLAGS_repetitions),
-        BindVisualizeSimulationLcm(&lcm));
-  } else {
-    clutter = std::make_unique<RandomClutterGenerator>(
-        std::move(scene_tree), clutter_instances,
+  clutter = std::make_unique<RandomClutterGenerator>(
+        scene_tree.get(), clutter_instances,
         Vector3<double>(0.0, 0.0, 0.4),
         Vector3<double>(0.2, 0.4, 0.4 * FLAGS_repetitions));
-  }
+  
+  std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant = 
+  std::make_unique<systems::RigidBodyPlant<double>>(std::move(scene_tree));
+
+  std::unique_ptr<SimulatePlantToRest> dropper;
+
+  dropper = std::make_unique<SimulatePlantToRest>(std::move(scene_plant), 
+    FLAGS_visualize ? BindDrakeVisualizer(&lcm) : nullptr);
 
   std::default_random_engine generator(123);
 
@@ -105,10 +108,8 @@ int DoMain() {
     tstart = time(0);
     VectorX<double> q_ik =
         clutter->GenerateFloatingClutter(q_nominal, generator);
-
-    clutter->DropObjectsToGround(q_ik);
-
-    drake::log()->debug("About to simulate dropping");
+    drake::log()->debug("Successfully computed clutter. About to simulate dropping");
+    dropper->Run(q_ik, FLAGS_max_settling_time);
     tend = time(0);
 
     double process_time = std::difftime(tend, tstart);
@@ -117,9 +118,7 @@ int DoMain() {
     drake::log()->info("Computation time : {} sec", process_time);
     drake::log()->info("Mean computation time : {}", mean);
   }
-
-  drake::log()->info("Bounded Clutter generated\n");
-
+  
   return 0;
 }
 
