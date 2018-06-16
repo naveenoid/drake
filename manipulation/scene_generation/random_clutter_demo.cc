@@ -39,6 +39,8 @@ DEFINE_bool(fall_sim, false,
             "Compute a fall simulation to 'settle' the objects.");
 DEFINE_bool(add_z_height_cost, true,
             "Add a cost on the z height of the objects");
+DEFINE_bool(use_quaternions, false, "use floating rpy joints (optimise"
+  " orientation as well)");
 
 const char kPath[] = "examples/kuka_iiwa_arm/models/objects/";
 
@@ -71,7 +73,7 @@ std::unique_ptr<RigidBodyTreed> GenerateSceneTree(
       Isometry3<double> model_pose = Isometry3<double>::Identity();
       int tree_instances = tree_builder->AddFloatingModelInstance(
           model_name.str(), model_pose.translation(),
-          model_pose.linear().eulerAngles(0, 1, 2));
+          model_pose.linear().eulerAngles(0, 1, 2), FLAGS_use_quaternions);
       clutter_instance_list.push_back(tree_instances);
     }
   }

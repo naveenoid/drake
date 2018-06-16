@@ -64,15 +64,24 @@ int WorldSimTreeBuilder<T>::AddFixedModelInstance(const string& model_name,
 }
 
 template <typename T>
-int WorldSimTreeBuilder<T>::AddFloatingModelInstance(const string& model_name,
-                                                     const Vector3d& xyz,
-                                                     const Vector3d& rpy) {
+int WorldSimTreeBuilder<T>::AddFloatingModelInstance(
+  const string& model_name, const Vector3d& xyz, const Vector3d& rpy, 
+  bool use_quaternion_floating_joint) {
   DRAKE_DEMAND(!built_);
 
   auto weld_to_frame = allocate_shared<RigidBodyFrame<T>>(
       aligned_allocator<RigidBodyFrame<T>>(), "world", nullptr, xyz, rpy);
 
-  return AddModelInstanceToFrame(model_name, weld_to_frame, kQuaternion);
+  int model_instance_id;
+
+  if(use_quaternion_floating_joint) {
+    model_instance_id = AddModelInstanceToFrame(model_name, weld_to_frame, 
+      drake::multibody::joints::kQuaternion);
+  } else {
+    model_instance_id = AddModelInstanceToFrame(model_name, weld_to_frame, 
+        drake::multibody::joints::kRollPitchYaw);
+  }
+  return model_instance_id;
 }
 
 template <typename T>

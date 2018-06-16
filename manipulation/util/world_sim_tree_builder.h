@@ -72,7 +72,8 @@ class WorldSimTreeBuilder {
   /// @return model_instance_id of the object that is added.
   int AddFloatingModelInstance(
       const std::string& model_name, const Eigen::Vector3d& xyz,
-      const Eigen::Vector3d& rpy = Eigen::Vector3d::Zero());
+      const Eigen::Vector3d& rpy = Eigen::Vector3d::Zero(), 
+      bool use_quaternion_floating_joint = true);
 
   /// Adds a model instance specified by its model name, @p model_name, to
   /// the `RigidBodyTree` being built. The model instance is connected to the

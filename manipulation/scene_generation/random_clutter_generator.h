@@ -73,6 +73,7 @@ class RandomClutterGenerator {
  private:
   RigidBodyTreed* scene_tree_ptr_;
   std::vector<int> clutter_model_instances_;
+  std::vector<int> rpy_model_instances_;
 
   Vector3<double> clutter_center_{Vector3<double>::Zero()};
   Vector3<double> clutter_lb_{Vector3<double>::Zero()};

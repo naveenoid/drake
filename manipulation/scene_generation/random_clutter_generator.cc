@@ -26,10 +26,11 @@ using std::default_random_engine;
 using std::uniform_real_distribution;
 
 namespace {
-Eigen::VectorXi SimpleCumulativeSum(int num_elements) {
+Eigen::VectorXi SimpleCumulativeSum(int min_val, int num_elements) {
   Eigen::VectorXi cumsum = Eigen::VectorXi::Constant(num_elements, 0);
-  int i = 0;
+  int i = min_val;
   for (int it = 0; it < cumsum.size(); ++it) {
+    drake::log()->info("i: {}",it);
     cumsum(it) = i++;
   }
   return cumsum;
@@ -46,6 +47,31 @@ VectorX<double> GenerateBoundedRandomSample(
   }
   return return_vector;
 }
+
+Eigen::VectorXd Resize(const Eigen::VectorXd& x, int size) {
+  int current_size = x.size();
+  Eigen::VectorXd return_vector = x;
+  return_vector.resize(current_size + size);
+  return_vector.head(current_size) = x;
+  return_vector.tail(size) = VectorXd::Zero(size);
+  return return_vector;
+}
+
+Eigen::VectorXi Resize(const Eigen::VectorXi& x, int size) {
+  // drake::log()->info("x : {}", x.transpose());
+  int current_size = x.size();
+  // drake::log()->info("curret size : {}, requested_size {}", current_size, size);
+  Eigen::VectorXi return_vector = x;
+  return_vector.resize(current_size + size);
+  return_vector.head(current_size) = x;
+  return_vector.tail(size) = Eigen::VectorXi::Zero(size);
+
+  // drake::log()->info("return_vector: {}", return_vector.transpose());
+  // drake::log()->info(
+  //   "original {}, new {}", x.transpose(), return_vector.transpose());
+  return return_vector;
+}
+
 
 }  // namespace
 
@@ -97,19 +123,14 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
         active_bodies_idx, active_group_names);
     constraint_array.push_back(&min_distance_constraint);
 
-    Eigen::VectorXi linear_posture_iAfun =
-                        SimpleCumulativeSum(q_nominal.size()),
-                    linear_posture_jAvar = linear_posture_iAfun;
-    VectorX<double> linear_posture_A = VectorX<double>::Ones(q_nominal.size()),
-                    linear_posture_lb = q_nominal,
-                    linear_posture_ub = q_nominal;
+    Eigen::VectorXi linear_posture_iAfun, linear_posture_jAvar;
+    VectorX<double> linear_posture_A, linear_posture_lb, linear_posture_ub;
     VectorX<double> q_initial = q_nominal;
     std::vector<int> z_indices;
-
+    int skip = 0;
     Vector3<double> bounded_position;
     // Iterate through each of the model instances of the clutter and add
-    // elements
-    // to the linear posture_constraint.
+    // elements to the linear posture_constraint.
     for (auto& instance : clutter_model_instances_) {
       auto model_instance_bodies =
           scene_tree_ptr_->FindModelInstanceBodies(instance);
@@ -119,47 +140,148 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
           const DrakeJoint* joint = &body->getJoint();
           if (!joint->is_fixed()) {
             int joint_dofs = joint->get_num_positions();
-            // Enforces checks only for Floating quaternion joints.
-            DRAKE_DEMAND(joint_dofs == 1 || joint_dofs == 7);
-            VectorX<double> joint_lb = VectorX<double>::Zero(joint_dofs);
-            VectorX<double> joint_ub = joint_lb;
-            VectorX<double> joint_initial = joint_ub;
-            VectorX<double> joint_nominal = joint_ub;
-            if (joint_dofs == 7) {
-              // If the num dofs of the joint is 7 its a floating quaternion
-              // joint.The position part to be bounded by the clutter bounding
-              // box, the orientation part to be a random quaternion.
-              // Position
-              joint_lb.head(3) = clutter_lb_;
-              joint_ub.head(3) = clutter_ub_;
-              auto temp_out = GenerateBoundedRandomSample(
-                  generator, clutter_lb_, clutter_ub_);
-              joint_initial.head(3) = temp_out;
-              z_indices.push_back(body->get_position_start_index() + 2);
-              joint_nominal.head(3) = Vector3<double>::Zero(3);
-              // Orientation
-              Eigen::Quaterniond quat =
-                  drake::math::UniformlyRandomQuaternion(generator);
-              joint_lb[3] = quat.w();
-              joint_lb[4] = quat.x();
-              joint_lb[5] = quat.y();
-              joint_lb[6] = quat.z();
-              joint_ub.tail(4) = joint_lb.tail(4);
-              joint_initial.tail(4) = joint_ub.tail(4);
-              joint_nominal.tail(4) = joint_ub.tail(4);
-            } else if (joint_dofs == 1) {
-              // If the num dofs of the joint is 1, set lb, ub to joint_lim_min,
-              // joint_lim_max.
-              joint_lb[0] = joint->getJointLimitMin()[0];
-              joint_ub[0] = joint->getJointLimitMin()[0];
-              joint_initial =
-                  GenerateBoundedRandomSample(generator, joint_lb, joint_ub);
-              joint_nominal = joint_initial;
+            DRAKE_DEMAND(joint_dofs == 1 || joint_dofs == 7 || joint_dofs == 6);
+            VectorX<double> joint_lb, joint_ub, joint_initial, joint_nominal;
+
+            int current_size = linear_posture_iAfun.size();
+
+            switch (joint_dofs) {
+              case 7 :
+                {
+                  joint_lb = VectorX<double>::Zero(7);
+                  joint_ub = joint_lb;
+                  joint_initial = joint_lb;
+                  joint_nominal = joint_lb;
+
+                  // Add 7 ints to the iAfun, jAvar
+                  // linear_posture_A has 7 ones added.
+                  linear_posture_iAfun = Resize(linear_posture_iAfun, 7);
+                  linear_posture_iAfun.tail(7) = SimpleCumulativeSum(current_size, 7);
+                  linear_posture_jAvar = Resize(linear_posture_jAvar, 7);
+                  linear_posture_A = Resize(linear_posture_A, 7);
+                  linear_posture_A.tail(7) = VectorX<double>::Ones(7);
+
+                  linear_posture_lb = Resize(linear_posture_lb, 7);
+                  linear_posture_ub = Resize(linear_posture_ub, 7);
+                  joint_lb.head(3) = clutter_lb_;
+                  joint_ub.head(3) = clutter_ub_;
+
+                  auto temp_out = GenerateBoundedRandomSample(
+                      generator, clutter_lb_, clutter_ub_);
+                  joint_initial.head(3) = temp_out;
+                  z_indices.push_back(body->get_position_start_index() + 2);
+                  joint_nominal.head(3) = Vector3<double>::Zero(3);
+
+                  // Orientation
+                  Eigen::Quaterniond quat =
+                      drake::math::UniformlyRandomQuaternion(generator);
+                  joint_lb[3] = quat.w();
+                  joint_lb[4] = quat.x();
+                  joint_lb[5] = quat.y();
+                  joint_lb[6] = quat.z();
+                  joint_ub.tail(4) = joint_lb.tail(4);
+                  linear_posture_lb.tail(7) = joint_lb;
+                  linear_posture_ub.tail(7) = joint_ub;
+
+                  joint_initial.tail(4) = joint_ub.tail(4);
+                  joint_nominal.tail(4) = joint_ub.tail(4);
+
+                  linear_posture_lb.segment(body->get_position_start_index(),
+                                        joint_dofs) = joint_lb;
+                  linear_posture_ub.segment(body->get_position_start_index(),
+                                        joint_dofs) = joint_ub;
+                }
+                break;
+
+              case 6 :
+                {
+                  joint_lb = VectorX<double>::Zero(6);
+                  joint_ub = joint_lb;
+                  joint_initial = VectorX<double>::Zero(6);
+                  joint_nominal = VectorX<double>::Zero(6);
+
+                  int tail_val = 0;
+                  if(linear_posture_iAfun.size() > 0) {
+                    tail_val = linear_posture_iAfun(linear_posture_iAfun.size()-1);  
+                    drake::log()->info("size {}, tail val {}", linear_posture_iAfun.size(), tail_val);
+                  }
+                  
+                  drake::log()->info("A. linear_posture_iAfun : {}", linear_posture_iAfun.transpose());
+                  linear_posture_iAfun = Resize(linear_posture_iAfun, 3);
+                  drake::log()->info("B. linear_posture_iAfun : {}", linear_posture_iAfun.transpose());
+                  linear_posture_iAfun.tail(3) = SimpleCumulativeSum(tail_val + skip, 3);
+                  drake::log()->info("C. linear_posture_iAfun : {}", linear_posture_iAfun.transpose());
+
+                  linear_posture_jAvar = Resize(linear_posture_jAvar, 3);
+                  linear_posture_jAvar = linear_posture_iAfun;
+                  linear_posture_A = Resize(linear_posture_A, 3);
+                  linear_posture_A.tail(3) = VectorX<double>::Ones(3);
+
+                  linear_posture_lb = Resize(linear_posture_lb, 6);
+                  linear_posture_ub = Resize(linear_posture_ub, 6);
+                  joint_lb.head(3) = clutter_lb_;
+                  joint_ub.head(3) = clutter_ub_;
+
+                  auto temp_out = GenerateBoundedRandomSample(
+                      generator, clutter_lb_, clutter_ub_);
+                  joint_initial.head(3) = temp_out;
+                  z_indices.push_back(body->get_position_start_index() + 2);
+                  joint_nominal.head(3) = Vector3<double>::Zero(3);
+
+                  // Orientation
+                  Vector3d rpy =
+                      drake::math::UniformlyRandomRPY(generator);
+                  joint_initial[3] = rpy[0];
+                  joint_initial[4] = rpy[1];
+                  joint_initial[5] = rpy[2];
+                  
+                  linear_posture_lb.tail(6) = joint_lb;
+                  linear_posture_ub.tail(6) = joint_ub;
+                  skip = 3;
+
+                  // drake::log()->info("joint ini :{}", joint_initial.transpose());
+                  // drake::log()->info("joint nom :{}", joint_nominal.transpose());
+
+                  // drake::log()->info("iAfun {}", linear_posture_iAfun.transpose() );
+                  // drake::log()->info("jAvar {}", linear_posture_jAvar.transpose() );
+                  // drake::log()->info("lb {}", linear_posture_lb.transpose() );
+                  // drake::log()->info("ub {}", linear_posture_ub.transpose() );
+
+                }
+                break;
+
+              case 1 : 
+                {
+                  joint_lb = VectorX<double>::Zero(1);
+                  joint_ub = joint_lb;
+                  joint_initial = VectorX<double>::Zero(1);
+                  joint_nominal = VectorX<double>::Zero(1);
+
+                  linear_posture_iAfun = Resize(linear_posture_iAfun, 1);
+                  linear_posture_iAfun.tail(1) = SimpleCumulativeSum(
+                    current_size, 1);
+                  linear_posture_jAvar = Resize(linear_posture_jAvar, 1);
+                  linear_posture_A = Resize(linear_posture_A, 1);
+                  linear_posture_A.tail(1) = VectorX<double>::Ones(1);
+
+                  linear_posture_lb = Resize(linear_posture_lb, 1);
+                  linear_posture_ub = Resize(linear_posture_ub, 1);
+                  
+                  joint_lb[0] = joint->getJointLimitMin()[0];
+                  joint_ub[0] = joint->getJointLimitMin()[0];
+                  joint_initial = GenerateBoundedRandomSample(
+                    generator, joint_lb, joint_ub);
+                  joint_nominal = joint_initial;
+
+                  linear_posture_lb.segment(body->get_position_start_index(),
+                                        joint_dofs) = joint_lb;
+                  linear_posture_ub.segment(body->get_position_start_index(),
+                                        joint_dofs) = joint_ub;
+                  skip = 0;
+                }
+                break;
+
             }
-            linear_posture_lb.segment(body->get_position_start_index(),
-                                      joint_dofs) = joint_lb;
-            linear_posture_ub.segment(body->get_position_start_index(),
-                                      joint_dofs) = joint_ub;
             q_initial.segment(body->get_position_start_index(), joint_dofs) =
                 joint_initial;
             q_nominal_candidate.segment(body->get_position_start_index(),
@@ -169,10 +291,28 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
       }
     }
 
+
+
     linear_posture_A = VectorX<double>::Ones(linear_posture_iAfun.size());
 
-    drake::log()->debug("Adding SingleTimeLinearPostureConstraint");
+    // drake::log()->debug("lb num {}", linear_posture_lb.size());
+    // drake::log()->debug("ub num {}", linear_posture_ub.size());
+    // drake::log()->debug("A num {}", linear_posture_A.size());
+    // drake::log()->debug("iAfun {}", linear_posture_iAfun.size());
+    // drake::log()->debug("jAvar {}", linear_posture_jAvar.size());
 
+
+    drake::log()->info("lb num {} :{}", linear_posture_lb.size(), linear_posture_lb.transpose());
+    drake::log()->info("ub num {} :{}", linear_posture_ub.size(), linear_posture_ub.transpose());
+    drake::log()->info("A num {} :{}", linear_posture_A.size(), linear_posture_A.transpose());
+    drake::log()->info("iAfun {} :{}", linear_posture_iAfun.size(), linear_posture_iAfun.transpose());
+    drake::log()->info("jAvar {} :{}", linear_posture_jAvar.size(), linear_posture_jAvar.transpose());
+
+       drake::log()->debug("Adding SingleTimeLinearPostureConstraint");
+
+
+
+ 
     SingleTimeLinearPostureConstraint linear_posture_constraint(
         scene_tree_ptr_, linear_posture_iAfun, linear_posture_jAvar,
         linear_posture_A, linear_posture_lb, linear_posture_ub);
