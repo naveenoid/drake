@@ -54,7 +54,7 @@ std::unique_ptr<RigidBodyTreed> GenerateSceneTree(
 
   std::unique_ptr<util::WorldSimTreeBuilder<double>> tree_builder =
       std::make_unique<util::WorldSimTreeBuilder<double>>();
-  tree_builder->StoreModel("open_top_box", kPath + "open_top_box.urdf");
+  tree_builder->StoreModel("open_top_box", string(kPath) + "open_top_box.urdf");
   tree_builder->AddFixedModelInstance("open_top_box",
                                       Eigen::Vector3d(0, 0, 0.01));
 
