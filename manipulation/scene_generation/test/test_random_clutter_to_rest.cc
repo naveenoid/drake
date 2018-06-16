@@ -105,7 +105,7 @@ TEST_F(ClutterGeneratorTest, TestClutterIkValidity) {
 
   for (int i = 0; i< kNumTrials; ++i) {
   	EXPECT_NO_THROW(
-      q_ik = clutter_generator_->GenerateFloatingClutter(q_initial, generator));
+      q_ik = clutter_generator_->GenerateFloatingClutter(q_initial, &generator));
 	EXPECT_EQ(q_ik.size(), num_positions_);
 	EXPECT_NO_THROW(VerifyClutterIk(q_ik, 8));
 	
@@ -127,7 +127,7 @@ TEST_F(ClutterGeneratorTest, TestPlantToRest) {
   VectorX<double> q_initial = VectorX<double>::Random(num_positions_);
   VectorX<double> q_ik, q_out, q_out_stored;
 	EXPECT_NO_THROW(
-      q_ik = clutter_generator_->GenerateFloatingClutter(q_initial, generator));
+      q_ik = clutter_generator_->GenerateFloatingClutter(q_initial, &generator));
 
 	EXPECT_NO_THROW(
 		q_out_stored = plant_to_rest_->Run(q_ik));

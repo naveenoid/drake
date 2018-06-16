@@ -1,5 +1,7 @@
 #include "drake/manipulation/scene_generation/simulate_plant_to_rest.h"
 
+#include <utility>
+
 #include "drake/common/eigen_types.h"
 #include "drake/lcm/drake_lcm.h"
 #include "drake/multibody/rigid_body_plant/drake_visualizer.h"
@@ -19,10 +21,11 @@ SimulatePlantToRest::SimulatePlantToRest(
     std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant,
     std::unique_ptr<systems::DrakeVisualizer> visualizer)
     : plant_ptr_(scene_plant.get()),
-      diagram_(GenerateDiagram(std::move(scene_plant), std::move(visualizer))) {}
+      diagram_(GenerateDiagram(std::move(scene_plant), std::move(visualizer))) {
+}
 
 std::unique_ptr<systems::Diagram<double>> SimulatePlantToRest::GenerateDiagram(
-    std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant, 
+    std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant,
     std::unique_ptr<systems::DrakeVisualizer> visualizer) {
   systems::DiagramBuilder<double> builder;
 
@@ -33,7 +36,7 @@ std::unique_ptr<systems::Diagram<double>> SimulatePlantToRest::GenerateDiagram(
   systems::CompliantMaterial default_material;
   default_material
       .set_youngs_modulus(5e6)  // Pa
-      .set_dissipation(12)       // s/m
+      .set_dissipation(12)      // s/m
       .set_friction(1.2, 0.5);
   plant->set_default_compliant_material(default_material);
 
@@ -43,8 +46,7 @@ std::unique_ptr<systems::Diagram<double>> SimulatePlantToRest::GenerateDiagram(
   plant->set_contact_model_parameters(model_parameters);
 
   if (visualizer) {
-    auto visualizer_system =
-        builder.template AddSystem(std::move(visualizer));
+    auto visualizer_system = builder.template AddSystem(std::move(visualizer));
     visualizer_system->set_name("visualizer");
 
     builder.Connect(plant->get_output_port(0),
@@ -60,9 +62,10 @@ std::unique_ptr<systems::Diagram<double>> SimulatePlantToRest::GenerateDiagram(
   return builder.Build();
 }
 
-VectorX<double> SimulatePlantToRest::Run(
-  const VectorX<double>& q_ik, VectorX<double> *v_final, 
-  double v_threshold, double max_settling_time) {
+VectorX<double> SimulatePlantToRest::Run(const VectorX<double>& q_ik,
+                                         VectorX<double>* v_final,
+                                         double v_threshold,
+                                         double max_settling_time) {
   systems::Simulator<double> simulator(*diagram_);
 
   int num_positions = plant_ptr_->get_num_positions();
@@ -89,7 +92,8 @@ VectorX<double> SimulatePlantToRest::Run(
         *diagram_, 0.0001, &simulator.get_mutable_context());
     simulator.get_mutable_integrator()->set_maximum_step_size(max_step_size);
     simulator.get_mutable_integrator()->set_fixed_step_mode(true);
-    step_time = 1.0; step_delta = 0.1;
+    step_time = 1.0;
+    step_delta = 0.1;
     do {
       drake::log()->debug("Starting Simulation");
 
@@ -97,12 +101,16 @@ VectorX<double> SimulatePlantToRest::Run(
       step_time += step_delta;
       x = simulator.get_context().get_continuous_state_vector().CopyToVector();
       v = x.tail(num_velocities);
-    } while ((v.array() > v_threshold).any() && step_time <= max_settling_time);  
+    } while ((v.array() > v_threshold).any() && step_time <= max_settling_time);
     // If terminal velocities are nan, then half the step size and try again.
-    max_step_size /= 2.0;
+    if (isnan(v.array()).any()) {
+      max_step_size /= 2.0;
+      drake::log()->debug(
+          "Simulation exploded. Halving max_time_step and restarting");
+    }
   } while (isnan(v.array()).any());
-  
-  if(v_final != nullptr) {
+
+  if (v_final != nullptr) {
     *v_final = v;
   }
   drake::log()->info("In-Simulation time : {} sec", step_time);

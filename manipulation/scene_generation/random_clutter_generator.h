@@ -14,26 +14,24 @@ namespace scene_generation {
 /**
  * Given a RigidBodyTree containing a given scene the RandomClutterGenerator
  * can repeatedly generate bounded random poses/configurations on selected
- * model instances within the tree.
- * Each of these objects are seperated from each other by (settable) minimum
- * distance and their object frames are located within a (settable) bounding
- * box volume.
- * This class solves the IK problem to find feasible
- * poses on the clutter bodies
- * 
+ * model instances within the tree. Each of these objects are seperated from
+ * each other by (settable) minimum distance and their object frames are
+ * located within a (settable) bounding box volume. This class solves the
+ * IK problem to find feasible poses on the clutter bodies
+ *
  * NOTES :
  * 1. Current version only ensures bounded clutter for the case of all model
  * instances on the tree containing the QuaternionFloatingJoint.
  * 2. The current version has only been tested with SNOPT.
- * 3. The solvability of the problem is strongly dependent on the dimensions 
+ * 3. The solvability of the problem is strongly dependent on the dimensions
  * of the clutter bounding volume as specified in clutter_size and the number
- * and geometry of the clutter model instances that are to be dealt with. There 
- * is no explicit time-out on the execution and the GenerateFloatingClutter 
+ * and geometry of the clutter model instances that are to be dealt with. There
+ * is no explicit time-out on the execution and the GenerateFloatingClutter
  * will keep attempting to find a solution, if any.
- * 4. There are no explicit guarantees on the solvability
- * 5. The underlying IK computations utilise the bullet collision library and 
- * as such only process the convex-hull of the geometry. The resulting IK 
- * solution will be subject to this simplification. 
+ * 4. There are no explicit guarantees on the solvability.
+ * 5. The underlying IK computations utilise the bullet collision library and
+ * as such only process the convex-hull of the geometry. The resulting IK
+ * solution will be subject to this simplification.
  */
 
 class RandomClutterGenerator {
@@ -52,9 +50,9 @@ class RandomClutterGenerator {
    * @param min_inter_object_distance Minimum distance between objects.
    */
   RandomClutterGenerator(RigidBodyTree<double>* scene_tree,
-                         std::vector<int> clutter_model_instances,
-                         Vector3<double> clutter_center,
-                         Vector3<double> clutter_size,
+                         const std::vector<int>& clutter_model_instances,
+                         const Vector3<double>& clutter_center,
+                         const Vector3<double>& clutter_size,
                          double min_inter_object_distance = 0.001);
 
   /**
@@ -64,12 +62,16 @@ class RandomClutterGenerator {
    * the model_instances not specified in `clutter_model_instances' are set
    * to this value.
    * @param generator : used to pass a seed.
+   * @param add_z_height_cost : A flag to add a cost on the height (z) of each
+   * of
+   * the model
    */
-  VectorX<double> GenerateFloatingClutter(
-      VectorX<double> q_nominal, std::default_random_engine& generator);
+  VectorX<double> GenerateFloatingClutter(const VectorX<double>& q_nominal,
+                                          std::default_random_engine *generator,
+                                          bool add_z_height_cost = false);
 
  private:
-  RigidBodyTreed *scene_tree_ptr_;
+  RigidBodyTreed* scene_tree_ptr_;
   std::vector<int> clutter_model_instances_;
 
   Vector3<double> clutter_center_{Vector3<double>::Zero()};

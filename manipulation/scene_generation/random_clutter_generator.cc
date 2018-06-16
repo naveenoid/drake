@@ -1,5 +1,7 @@
 #include "drake/manipulation/scene_generation/random_clutter_generator.h"
 
+#include <algorithm>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -34,13 +36,13 @@ Eigen::VectorXi SimpleCumulativeSum(int num_elements) {
 }
 
 VectorX<double> GenerateBoundedRandomSample(
-    std::default_random_engine& generator, VectorX<double> min,
+    std::default_random_engine *generator, VectorX<double> min,
     VectorX<double> max) {
   DRAKE_DEMAND(min.size() == max.size());
   VectorX<double> return_vector = VectorX<double>::Zero(min.size());
   for (int i = 0; i < min.size(); ++i) {
     uniform_real_distribution<double> distribution(min(i), max(i));
-    return_vector(i) = distribution(generator);
+    return_vector(i) = distribution(*generator);
   }
   return return_vector;
 }
@@ -49,9 +51,8 @@ VectorX<double> GenerateBoundedRandomSample(
 
 RandomClutterGenerator::RandomClutterGenerator(
     RigidBodyTree<double>* scene_tree,
-    std::vector<int> clutter_model_instances, 
-    Vector3<double> clutter_center,
-    Vector3<double> clutter_size,
+    const std::vector<int>& clutter_model_instances,
+    const Vector3<double>& clutter_center, const Vector3<double>& clutter_size,
     double min_inter_object_distance)
     : scene_tree_ptr_(scene_tree),
       clutter_model_instances_(clutter_model_instances),
@@ -71,14 +72,16 @@ RandomClutterGenerator::RandomClutterGenerator(
 }
 
 VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
-    const VectorX<double> q_nominal, std::default_random_engine& generator) {
+    const VectorX<double>& q_nominal, std::default_random_engine *generator,
+    bool add_z_height_cost) {
   DRAKE_DEMAND(scene_tree_ptr_->get_num_positions() == q_nominal.size());
 
+  VectorX<double> q_nominal_candidate = q_nominal;
   VectorX<double> q_ik_result = q_nominal;
 
   int ik_result_code = 100;
   // Keep running the IK until a feasible solution is found.
-  while (ik_result_code != 1) {
+  while (ik_result_code > 1) {
     drake::log()->debug("IK new run initiated on tree of size {}.",
                         scene_tree_ptr_->get_num_positions());
 
@@ -101,6 +104,7 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
                     linear_posture_lb = q_nominal,
                     linear_posture_ub = q_nominal;
     VectorX<double> q_initial = q_nominal;
+    std::vector<int> z_indices;
 
     Vector3<double> bounded_position;
     // Iterate through each of the model instances of the clutter and add
@@ -120,6 +124,7 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
             VectorX<double> joint_lb = VectorX<double>::Zero(joint_dofs);
             VectorX<double> joint_ub = joint_lb;
             VectorX<double> joint_initial = joint_ub;
+            VectorX<double> joint_nominal = joint_ub;
             if (joint_dofs == 7) {
               // If the num dofs of the joint is 7 its a floating quaternion
               // joint.The position part to be bounded by the clutter bounding
@@ -130,16 +135,18 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
               auto temp_out = GenerateBoundedRandomSample(
                   generator, clutter_lb_, clutter_ub_);
               joint_initial.head(3) = temp_out;
-
+              z_indices.push_back(body->get_position_start_index() + 2);
+              joint_nominal.head(3) = Vector3<double>::Zero(3);
               // Orientation
               Eigen::Quaterniond quat =
-                  drake::math::UniformlyRandomQuaternion(&generator);
+                  drake::math::UniformlyRandomQuaternion(generator);
               joint_lb[3] = quat.w();
               joint_lb[4] = quat.x();
               joint_lb[5] = quat.y();
               joint_lb[6] = quat.z();
               joint_ub.tail(4) = joint_lb.tail(4);
               joint_initial.tail(4) = joint_ub.tail(4);
+              joint_nominal.tail(4) = joint_ub.tail(4);
             } else if (joint_dofs == 1) {
               // If the num dofs of the joint is 1, set lb, ub to joint_lim_min,
               // joint_lim_max.
@@ -147,6 +154,7 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
               joint_ub[0] = joint->getJointLimitMin()[0];
               joint_initial =
                   GenerateBoundedRandomSample(generator, joint_lb, joint_ub);
+              joint_nominal = joint_initial;
             }
             linear_posture_lb.segment(body->get_position_start_index(),
                                       joint_dofs) = joint_lb;
@@ -154,6 +162,8 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
                                       joint_dofs) = joint_ub;
             q_initial.segment(body->get_position_start_index(), joint_dofs) =
                 joint_initial;
+            q_nominal_candidate.segment(body->get_position_start_index(),
+                                        joint_dofs) = joint_nominal;
           }
         }
       }
@@ -170,18 +180,28 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
     constraint_array.push_back(&linear_posture_constraint);
     drake::log()->debug("Constraint array size {}", constraint_array.size());
 
+    Eigen::MatrixXd Q_candidate =
+        Eigen::MatrixXd::Zero(q_initial.size(), q_initial.size());
+
+    if (add_z_height_cost) {
+      for (auto& it : z_indices) {
+        Q_candidate(it, it) = 100;
+      }
+    }
+
     IKoptions ikoptions(scene_tree_ptr_);
-    ikoptions.setQ(Eigen::MatrixXd::Zero(q_initial.size(), q_initial.size()));
+    ikoptions.setQ(Q_candidate);
     ikoptions.setDebug(true);
 
     // setup IK problem and run.
-    IKResults ik_results = inverseKinSimple(
-        scene_tree_ptr_, q_initial, q_nominal, constraint_array, ikoptions);
+    IKResults ik_results =
+        inverseKinSimple(scene_tree_ptr_, q_initial, q_nominal_candidate,
+                         constraint_array, ikoptions);
 
     for (auto it : ik_results.info) {
       drake::log()->info("IK Result code : {}", it);
       ik_result_code = it;
-      if (ik_result_code != 1) {
+      if (ik_result_code > 1) {
         drake::log()->debug("IK failure, recomputing IK");
       }
     }
@@ -192,7 +212,6 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
   }
   return q_ik_result;
 }
-
 
 }  // namespace scene_generation
 }  // namespace manipulation
