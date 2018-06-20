@@ -35,12 +35,15 @@ DEFINE_double(max_settling_time, 1.5,
               "maximum simulation time for settling the"
               "object.");
 DEFINE_double(v_threshold, 0.1, "velocity threshold to terminate sim early.");
+DEFINE_double(min_distance, 0.005, "minimum distance between objects");
 DEFINE_bool(fall_sim, false,
             "Compute a fall simulation to 'settle' the objects.");
 DEFINE_bool(add_z_height_cost, true,
             "Add a cost on the z height of the objects");
 DEFINE_bool(use_quaternions, false, "use floating rpy joints (optimise"
   " orientation as well)");
+DEFINE_bool(return_infeasible_as_well, true, "return constraint accuracy tolerance "
+  "not met solutions as well.");
 
 const char kPath[] = "examples/kuka_iiwa_arm/models/objects/";
 
@@ -106,7 +109,8 @@ int DoMain() {
 
   clutter = std::make_unique<RandomClutterGenerator>(
       scene_tree.get(), clutter_instances, Vector3<double>(0.0, 0.0, 0.3),
-      Vector3<double>(0.2, 0.4, 0.3 * FLAGS_repetitions));
+      Vector3<double>(0.17, 0.34, 0.3 * FLAGS_repetitions), FLAGS_min_distance);
+  //Vector3<double>(0.2, 0.4, 0.3 * FLAGS_repetitions));
 
   auto scene_plant =
       std::make_unique<systems::RigidBodyPlant<double>>(std::move(scene_tree));
@@ -138,7 +142,7 @@ int DoMain() {
   for (int i = 0; i < FLAGS_max_iterations; ++i) {
     tstart = time(0);
     VectorX<double> q_ik = clutter->GenerateFloatingClutter(
-        q_nominal, &generator, FLAGS_add_z_height_cost);
+        q_nominal, &generator, FLAGS_add_z_height_cost, FLAGS_return_infeasible_as_well);
     if (FLAGS_visualize_only_terminal_state) {
       simple_tree_visualizer->visualize(q_ik);
     }

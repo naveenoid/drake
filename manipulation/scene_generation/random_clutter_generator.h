@@ -68,7 +68,8 @@ class RandomClutterGenerator {
    */
   VectorX<double> GenerateFloatingClutter(const VectorX<double>& q_nominal,
                                           std::default_random_engine *generator,
-                                          bool add_z_height_cost = false);
+                                          bool add_z_height_cost = false, 
+                                          bool return_infeasible_as_well = true);
 
  private:
   RigidBodyTreed* scene_tree_ptr_;

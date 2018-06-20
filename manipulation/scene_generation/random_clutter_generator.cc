@@ -30,7 +30,7 @@ Eigen::VectorXi SimpleCumulativeSum(int min_val, int num_elements) {
   Eigen::VectorXi cumsum = Eigen::VectorXi::Constant(num_elements, 0);
   int i = min_val;
   for (int it = 0; it < cumsum.size(); ++it) {
-    drake::log()->info("i: {}",it);
+    // drake::log()->info("i: {}",it);
     cumsum(it) = i++;
   }
   return cumsum;
@@ -99,15 +99,18 @@ RandomClutterGenerator::RandomClutterGenerator(
 
 VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
     const VectorX<double>& q_nominal, std::default_random_engine *generator,
-    bool add_z_height_cost) {
+    bool add_z_height_cost, bool return_infeasible_as_well) {
   DRAKE_DEMAND(scene_tree_ptr_->get_num_positions() == q_nominal.size());
 
   VectorX<double> q_nominal_candidate = q_nominal;
   VectorX<double> q_ik_result = q_nominal;
 
   int ik_result_code = 100;
+
+  int max_result_code = return_infeasible_as_well? 10 : 1;
+
   // Keep running the IK until a feasible solution is found.
-  while (ik_result_code > 1) {
+  while (ik_result_code > max_result_code) {
     drake::log()->debug("IK new run initiated on tree of size {}.",
                         scene_tree_ptr_->get_num_positions());
 
@@ -127,8 +130,9 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
     VectorX<double> linear_posture_A, linear_posture_lb, linear_posture_ub;
     VectorX<double> q_initial = q_nominal;
     std::vector<int> z_indices;
-    int skip = 0;
+   // int skip = 0;
     Vector3<double> bounded_position;
+    int clutter_body_ctr = 0;
     // Iterate through each of the model instances of the clutter and add
     // elements to the linear posture_constraint.
     for (auto& instance : clutter_model_instances_) {
@@ -143,11 +147,11 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
             DRAKE_DEMAND(joint_dofs == 1 || joint_dofs == 7 || joint_dofs == 6);
             VectorX<double> joint_lb, joint_ub, joint_initial, joint_nominal;
 
-            int current_size = linear_posture_iAfun.size();
+//            int current_size = linear_posture_iAfun.size();
 
             switch (joint_dofs) {
               case 7 :
-                {
+                {/*
                   joint_lb = VectorX<double>::Zero(7);
                   joint_ub = joint_lb;
                   joint_initial = joint_lb;
@@ -189,7 +193,7 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
                   linear_posture_lb.segment(body->get_position_start_index(),
                                         joint_dofs) = joint_lb;
                   linear_posture_ub.segment(body->get_position_start_index(),
-                                        joint_dofs) = joint_ub;
+                                        joint_dofs) = joint_ub;*/
                 }
                 break;
 
@@ -199,28 +203,22 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
                   joint_ub = joint_lb;
                   joint_initial = VectorX<double>::Zero(6);
                   joint_nominal = VectorX<double>::Zero(6);
-
-                  int tail_val = 0;
-                  if(linear_posture_iAfun.size() > 0) {
-                    tail_val = linear_posture_iAfun(linear_posture_iAfun.size()-1);  
-                    drake::log()->info("size {}, tail val {}", linear_posture_iAfun.size(), tail_val);
-                  }
                   
-                  drake::log()->info("A. linear_posture_iAfun : {}", linear_posture_iAfun.transpose());
+                  // drake::log()->info("A. linear_posture_iAfun : {}", linear_posture_iAfun.transpose());
                   linear_posture_iAfun = Resize(linear_posture_iAfun, 3);
-                  drake::log()->info("B. linear_posture_iAfun : {}", linear_posture_iAfun.transpose());
-                  linear_posture_iAfun.tail(3) = SimpleCumulativeSum(tail_val + skip, 3);
-                  drake::log()->info("C. linear_posture_iAfun : {}", linear_posture_iAfun.transpose());
+                  // drake::log()->info("B. linear_posture_iAfun : {}", linear_posture_iAfun.transpose());
+                  linear_posture_iAfun.tail(3) = SimpleCumulativeSum(3 * clutter_body_ctr++, 3);
+                  // drake::log()->info("C. linear_posture_iAfun : {}", linear_posture_iAfun.transpose());
 
                   linear_posture_jAvar = Resize(linear_posture_jAvar, 3);
-                  linear_posture_jAvar = linear_posture_iAfun;
+                  linear_posture_jAvar.tail(3) = SimpleCumulativeSum(body->get_position_start_index(), 3);
                   linear_posture_A = Resize(linear_posture_A, 3);
                   linear_posture_A.tail(3) = VectorX<double>::Ones(3);
 
-                  linear_posture_lb = Resize(linear_posture_lb, 6);
-                  linear_posture_ub = Resize(linear_posture_ub, 6);
-                  joint_lb.head(3) = clutter_lb_;
-                  joint_ub.head(3) = clutter_ub_;
+                  linear_posture_lb = Resize(linear_posture_lb, 3);
+                  linear_posture_ub = Resize(linear_posture_ub, 3);
+                  joint_lb = clutter_lb_;
+                  joint_ub = clutter_ub_;
 
                   auto temp_out = GenerateBoundedRandomSample(
                       generator, clutter_lb_, clutter_ub_);
@@ -235,9 +233,8 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
                   joint_initial[4] = rpy[1];
                   joint_initial[5] = rpy[2];
                   
-                  linear_posture_lb.tail(6) = joint_lb;
-                  linear_posture_ub.tail(6) = joint_ub;
-                  skip = 3;
+                  linear_posture_lb.tail(3) = joint_lb;
+                  linear_posture_ub.tail(3) = joint_ub;
 
                   // drake::log()->info("joint ini :{}", joint_initial.transpose());
                   // drake::log()->info("joint nom :{}", joint_nominal.transpose());
@@ -251,7 +248,7 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
                 break;
 
               case 1 : 
-                {
+                {/*
                   joint_lb = VectorX<double>::Zero(1);
                   joint_ub = joint_lb;
                   joint_initial = VectorX<double>::Zero(1);
@@ -277,7 +274,7 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
                                         joint_dofs) = joint_lb;
                   linear_posture_ub.segment(body->get_position_start_index(),
                                         joint_dofs) = joint_ub;
-                  skip = 0;
+                  skip = 0;*/
                 }
                 break;
 
@@ -302,17 +299,14 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
     // drake::log()->debug("jAvar {}", linear_posture_jAvar.size());
 
 
-    drake::log()->info("lb num {} :{}", linear_posture_lb.size(), linear_posture_lb.transpose());
-    drake::log()->info("ub num {} :{}", linear_posture_ub.size(), linear_posture_ub.transpose());
-    drake::log()->info("A num {} :{}", linear_posture_A.size(), linear_posture_A.transpose());
-    drake::log()->info("iAfun {} :{}", linear_posture_iAfun.size(), linear_posture_iAfun.transpose());
-    drake::log()->info("jAvar {} :{}", linear_posture_jAvar.size(), linear_posture_jAvar.transpose());
+    // drake::log()->info("lb num {} :{}", linear_posture_lb.size(), linear_posture_lb.transpose());
+    // drake::log()->info("ub num {} :{}", linear_posture_ub.size(), linear_posture_ub.transpose());
+    // drake::log()->info("A num {} :{}", linear_posture_A.size(), linear_posture_A.transpose());
+    // drake::log()->info("iAfun {} :{}", linear_posture_iAfun.size(), linear_posture_iAfun.transpose());
+    // drake::log()->info("jAvar {} :{}", linear_posture_jAvar.size(), linear_posture_jAvar.transpose());
 
        drake::log()->debug("Adding SingleTimeLinearPostureConstraint");
 
-
-
- 
     SingleTimeLinearPostureConstraint linear_posture_constraint(
         scene_tree_ptr_, linear_posture_iAfun, linear_posture_jAvar,
         linear_posture_A, linear_posture_lb, linear_posture_ub);
@@ -341,7 +335,7 @@ VectorX<double> RandomClutterGenerator::GenerateFloatingClutter(
     for (auto it : ik_results.info) {
       drake::log()->info("IK Result code : {}", it);
       ik_result_code = it;
-      if (ik_result_code > 1) {
+      if (ik_result_code > max_result_code) {
         drake::log()->debug("IK failure, recomputing IK");
       }
     }
