@@ -35,7 +35,7 @@ std::unique_ptr<systems::Diagram<double>> SimulatePlantToRest::GenerateDiagram(
 
   systems::CompliantMaterial default_material;
   default_material
-      .set_youngs_modulus(5e6)  // Pa
+      .set_youngs_modulus(5e7)  // Pa
       .set_dissipation(12)      // s/m
       .set_friction(1.2, 0.5);
   plant->set_default_compliant_material(default_material);
