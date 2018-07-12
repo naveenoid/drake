@@ -19,14 +19,17 @@ namespace scene_generation {
 
 SimulatePlantToRest::SimulatePlantToRest(
     std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant,
-    std::unique_ptr<systems::LeafSystem<double>> visualizer)
+    std::unique_ptr<systems::LeafSystem<double>> visualizer, 
+    std::unique_ptr<systems::System<double>> camera)
     : plant_ptr_(scene_plant.get()),
-      diagram_(GenerateDiagram(std::move(scene_plant), std::move(visualizer))) {
+      diagram_(GenerateDiagram(std::move(scene_plant), std::move(visualizer), 
+      std::move(camera))) {
 }
 
 std::unique_ptr<systems::Diagram<double>> SimulatePlantToRest::GenerateDiagram(
     std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant,
-    std::unique_ptr<systems::LeafSystem<double>> visualizer) {
+    std::unique_ptr<systems::LeafSystem<double>> visualizer, 
+    std::unique_ptr<systems::System<double>> camera) {
   systems::DiagramBuilder<double> builder;
 
   // Transferring ownership of tree to the RigidBodyPlant.
@@ -51,6 +54,13 @@ std::unique_ptr<systems::Diagram<double>> SimulatePlantToRest::GenerateDiagram(
 
     builder.Connect(plant->get_output_port(0),
                     visualizer_system->get_input_port(0));
+  }
+
+  if(camera) {
+    auto camera_system = builder.template AddSystem(std::move(camera));
+    camera_system->set_name("camera");
+    // Assumes the state input port is port 0.
+    builder.Connect(plant->get_output_port(0), camera_system->get_input_port(0));
   }
 
   if (plant->get_num_actuators() > 0) {
@@ -87,6 +97,8 @@ VectorX<double> SimulatePlantToRest::Run(const VectorX<double>& q_ik,
         .SetFromVector(x_initial);
     simulator.Initialize();
     simulator.get_mutable_context().set_time(0.0);
+      simulator.set_publish_at_initialization(true);
+  simulator.set_publish_every_time_step(false);
 
     simulator.reset_integrator<systems::RungeKutta2Integrator<double>>(
         *diagram_, 0.0001, &simulator.get_mutable_context());

@@ -35,10 +35,14 @@ class SimulatePlantToRest {
    * @param visualize A unique_ptr to a LeafSystem<double> that can be
    * specified to enable rendering the simulation, for eg. a DrakeVisualizer
    * system.
+   * @param camera A unique_ptr to a LeafSystem<double> that can be specified to
+   * enable rendering the simulation using a camera object, for eg. the 
+   * RGBDCamera system.
    */
   SimulatePlantToRest(
       std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant,
-      std::unique_ptr<systems::LeafSystem<double>> visualizer = {});
+      std::unique_ptr<systems::LeafSystem<double>> visualizer = {},
+      std::unique_ptr<systems::System<double>> camera = {});
 
   /**
    * Computes a simulation Run of the system starting from the configuration
@@ -59,13 +63,16 @@ class SimulatePlantToRest {
    * Returns a pointer to the Sim diagram which can then be used to build
    * custom simulations as desired.
    */
-  systems::Diagram<double>* GetSimDiagram();
+  systems::Diagram<double>* GetSimDiagram() {return diagram_.get(); }
+
+  systems::RigidBodyPlant<double>* GetPlant() { return plant_ptr_; }
 
  private:
   // Builds a diagram of the clutter scene.
   std::unique_ptr<systems::Diagram<double>> GenerateDiagram(
       std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant,
-      std::unique_ptr<systems::LeafSystem<double>> = {});
+      std::unique_ptr<systems::LeafSystem<double>> visualizer = {}, 
+      std::unique_ptr<systems::System<double>> camera = {} );
 
   systems::RigidBodyPlant<double>* plant_ptr_{nullptr};
   std::unique_ptr<systems::Diagram<double>> diagram_;
