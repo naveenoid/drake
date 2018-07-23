@@ -167,6 +167,14 @@ class RigidBodyPlant : public LeafSystem<T> {
   /// properties on collision elements (see CompliantMaterial for details).
   void set_default_compliant_material(const CompliantMaterial& material);
 
+  /// Gets the parameters of the compliance _model_ that has been set.
+  void get_contact_model_parameters(
+      const CompliantContactModelParameters& parameters);
+
+  /// Gets the compliant material values that have been set.
+  void get_default_compliant_material(const CompliantMaterial& material);
+
+
   /// Returns a constant reference to the multibody dynamics model
   /// of the world.
   const RigidBodyTree<double>& get_rigid_body_tree() const;

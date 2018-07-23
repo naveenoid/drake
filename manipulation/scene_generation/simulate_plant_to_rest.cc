@@ -26,6 +26,9 @@ SimulatePlantToRest::SimulatePlantToRest(
 
 std::unique_ptr<systems::Diagram<double>> SimulatePlantToRest::GenerateDiagram(
     std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant,
+    drake::optional<systems::ComplaintMaterial> material = {},
+    drake::optional<systems::CompliantContactModelParameters>
+    model_parameters = {},
     std::unique_ptr<systems::LeafSystem<double>> visualizer) {
   systems::DiagramBuilder<double> builder;
 
@@ -33,17 +36,26 @@ std::unique_ptr<systems::Diagram<double>> SimulatePlantToRest::GenerateDiagram(
   auto plant = builder.template AddSystem(std::move(scene_plant));
   plant->set_name("RBP");
 
-  systems::CompliantMaterial default_material;
-  default_material
-      .set_youngs_modulus(5e6)  // Pa
-      .set_dissipation(12)      // s/m
-      .set_friction(1.2, 0.5);
+  systems::CompliantMaterial compliant_material;
+  if(material) {
+    compliant_material = *material;
+  } else {
+    compliant_material
+        .set_youngs_modulus(5e6)  // Pa
+        .set_dissipation(12)      // s/m
+        .set_friction(1.2, 0.5);
+  }
   plant->set_default_compliant_material(default_material);
 
-  systems::CompliantContactModelParameters model_parameters;
-  model_parameters.characteristic_radius = 2e-4;  // m
-  model_parameters.v_stiction_tolerance = 0.1;    // m/s
-  plant->set_contact_model_parameters(model_parameters);
+  systems::CompliantContactModelParameters parameters;
+
+  if(model_parameters) {
+   parameters = *model_parameters;
+  } else {
+    parameters.characteristic_radius = 2e-4;  // m
+    parameters.v_stiction_tolerance = 0.1;    // m/s
+  }
+  plant->set_contact_model_parameters(parameters);
 
   if (visualizer) {
     auto visualizer_system = builder.template AddSystem(std::move(visualizer));

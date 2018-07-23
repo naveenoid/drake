@@ -4,6 +4,7 @@
 
 #include "drake/common/eigen_types.h"
 #include "drake/lcm/drake_lcm.h"
+#include "drake/drake_optional.h"
 #include "drake/multibody/rigid_body_plant/drake_visualizer.h"
 #include "drake/multibody/rigid_body_plant/rigid_body_plant.h"
 #include "drake/systems/framework/diagram.h"
@@ -32,25 +33,31 @@ class SimulatePlantToRest {
   /**
    * Constructs the SimulatePlantToRest
    * @param scene_plant A unique_ptr to a RigidBodyPlant of the scene.
+   * @param material Optional specification of the the material parameters.
+   * @param model_parameters Optional specification of the contact model
+   * parameters.
    * @param visualize A unique_ptr to a LeafSystem<double> that can be
    * specified to enable rendering the simulation, for eg. a DrakeVisualizer
    * system.
    */
   SimulatePlantToRest(
       std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant,
+      drake::optional<systems::ComplaintMaterial> material = {},
+      drake::optional<systems::CompliantContactModelParameters>
+      model_parameters = {},
       std::unique_ptr<systems::LeafSystem<double>> visualizer = {});
 
   /**
    * Computes simulation runs of the system starting from the configuration
-   * @p q_initial and returns the final stable configuration. Internally keeps 
-   * repeating the run by halving the max_time_step as if the terminal velocity 
-   * is greater than `v_final`. 
-   * @param v_final A pointer to hold the resulting final velocity upon 
+   * @p q_initial and returns the final stable configuration. Internally keeps
+   * repeating the run by halving the max_time_step as if the terminal velocity
+   * is greater than `v_final`.
+   * @param v_final A pointer to hold the resulting final velocity upon
    * completion of this simulation run.
    * @param v_threshold threshold on the velocity to terminate the execution
    * and return the terminal state.
    * @param max_settling_time is the max time to wait for settling the
-   * clutter scene. Upon reaching @param max_settling_time, the simulation 
+   * clutter scene. Upon reaching @param max_settling_time, the simulation
    * terminates regardless of the specified @param v_threshold.
    * @returns The generalized coordinates q representing a settled configuration
    * of the RigidBodyPlant.
@@ -60,7 +67,7 @@ class SimulatePlantToRest {
                       double v_threshold = 0.1, double max_settling_time = 1.5);
 
   /**
-   * Returns a pointer to the Sim diagram which can then be used in a variety 
+   * Returns a pointer to the Sim diagram which can then be used in a variety
    * of custom simulations.
    */
   systems::Diagram<double>* GetSimDiagram();
@@ -69,6 +76,8 @@ class SimulatePlantToRest {
   // Builds a diagram of the clutter scene.
   std::unique_ptr<systems::Diagram<double>> GenerateDiagram(
       std::unique_ptr<systems::RigidBodyPlant<double>> scene_plant,
+      const systems::ComplaintMaterial& material,
+      const systems::CompliantContactModelParameters& model_parameters,
       std::unique_ptr<systems::LeafSystem<double>> visualizer = {});
 
   systems::RigidBodyPlant<double>* plant_ptr_{nullptr};

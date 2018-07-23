@@ -53,7 +53,10 @@ void VerifyClutterIk(const VectorX<double>& q, int num_elements_in_clutter) {
 
 class ClutterGeneratorTest : public ::testing::Test {
  public:
-  virtual void SetUp() {
+  virtual void SetUp(
+    drake::optional<systems::ComplaintMaterial> material = {},
+    drake::optional<systems::CompliantContactModelParameters>
+    model_parameters = {}) {
     auto tree_builder = std::make_unique<util::WorldSimTreeBuilder<double>>();
     tree_builder->StoreModel("container",
                              std::string(kPath) + std::string(kContainer));

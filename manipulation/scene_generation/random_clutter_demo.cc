@@ -111,9 +111,11 @@ int DoMain() {
   if (FLAGS_fall_sim) {
     if (!FLAGS_visualize_only_terminal_state) {
       auto drake_visualizer = std::make_unique<systems::DrakeVisualizer>(
-          scene_plant->get_rigid_body_tree(), &lcm);
+        scene_plant->get_rigid_body_tree(), &lcm);
       dropper = std::make_unique<SimulatePlantToRest>(
-          std::move(scene_plant), std::move(drake_visualizer));
+        std::move(scene_plant), {} /* material */,
+        {} /* compliant model parameters */,
+        std::move(drake_visualizer));
     } else {
       dropper = std::make_unique<SimulatePlantToRest>(std::move(scene_plant));
     }
